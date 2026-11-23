@@ -150,9 +150,18 @@ class Handler(BaseHTTPRequestHandler):
         if not path.startswith('/api/jobs/'):
             return self.reply(404, {'error': 'Não encontrado.'})
         try:
-            job = jobs.get(identity.user_id, path.rsplit('/', 1)[-1])
+            job_id = path.rsplit('/', 1)[-1]
+            job = jobs.get(identity.user_id, job_id)
+            # A pesquisa original publica etapas e resultados antes do fim.
+            # Somente consulte esse estado depois de validar o dono da tarefa.
+            if job.get('status') == 'running':
+                with app.LOCK:
+                    partial = app.JOBS.get(job_id, {}).copy()
+                for key in ('message', 'progress', 'results', 'sources', 'warnings', 'queries'):
+                    if key in partial:
+                        job[key] = partial[key]
             if job.get('download'):
-                job['download']='/download/'+path.rsplit('/',1)[-1]
+                job['download']='/download/'+job_id
             job.pop('folder',None)
             return self.reply(200, job)
         except JobUnavailable:
