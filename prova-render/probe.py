@@ -35,9 +35,15 @@ def run_probe():
                 page.set_content('<title>Teste fictício</title><h1>Central SELIC</h1>')
                 result['playwright_ok'] = page.title() == 'Teste fictício'
                 result['chromium_ativo_mb'] = memory()
+                page.set_content('<style>body{font:36px sans-serif}</style><p>PROCESSO 1234/2026</p>')
+                image = path/'ocr.png'
+                page.screenshot(path=str(image))
             finally:
                 browser.close()
         result['playwright_segundos'] = round(time.monotonic()-start, 2)
+        ocr = subprocess.run(['tesseract', str(image), 'stdout', '-l', 'por'], capture_output=True, timeout=45)
+        result['ocr_ok'] = ocr.returncode == 0 and '1234/2026' in ocr.stdout.decode('utf-8', errors='replace')
+        result['apos_ocr_mb'] = memory()
     result['depois_mb'] = memory()
     return result
 
