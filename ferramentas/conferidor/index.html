@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conferidor de Processos - SELIC</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{
+      --bg:#f3f6f9; --card:#fff; --text:#17212b; --muted:#667085; --border:#d9e0e7;
+      --primary:#173f5f; --primary2:#20639b; --ok:#16835d; --warn:#b87503; --bad:#b42318;
+      --info:#175cd3; --shadow:0 2px 10px rgba(16,24,40,.07);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{background:linear-gradient(135deg,var(--primary),var(--primary2));color:#fff;padding:22px 28px}
+    header h1{margin:0 0 4px;font-size:23px} header p{margin:0;opacity:.9;font-size:13px}
+    main{max-width:1500px;margin:auto;padding:22px}
+    .grid{display:grid;gap:14px}.cards{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+    .metric .label{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+    .metric .value{font-size:30px;font-weight:800;margin-top:6px}.metric small{color:var(--muted)}
+    .upload-grid{grid-template-columns:1fr 1.4fr}
+    h2{font-size:17px;margin:0 0 12px} h3{font-size:14px;margin:0 0 8px}
+    .drop{border:2px dashed #9fb3c5;border-radius:10px;padding:18px;text-align:center;background:#f8fafc}
+    input[type=file]{width:100%;margin-top:10px}
+    button{border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .primary{background:var(--primary2);color:white}.secondary{background:#eaf1f7;color:var(--primary)}
+    .danger{background:#fee4e2;color:#912018}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+    .statusline{margin-top:10px;font-size:12px;color:var(--muted);white-space:pre-line}
+    .mainnav{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 14px}
+    .navbtn{background:#e8edf2;color:#344054;padding:12px 18px;font-size:14px}
+    .navbtn.active{background:var(--primary);color:#fff}
+    .screen{display:none}.screen.active{display:block}
+    .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}.tab{background:#e8edf2;color:#344054}
+    .tab.active{background:var(--primary);color:#fff}.panel{display:none}.panel.active{display:block}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+    .toolbar input,.toolbar select{padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:#fff}
+    .toolbar input{min-width:260px;flex:1}
+    .table-wrap{overflow:auto;max-height:640px;border:1px solid var(--border);border-radius:10px;background:#fff}
+    table{border-collapse:collapse;width:100%;font-size:12px}
+    th,td{padding:9px 10px;border-bottom:1px solid #eaecf0;vertical-align:top;text-align:left}
+    th{position:sticky;top:0;background:#f8fafc;z-index:1;color:#344054;white-space:nowrap}
+    tr:hover td{background:#f9fbfd}.nowrap{white-space:nowrap}.muted{color:var(--muted)}
+    .badge{display:inline-block;padding:3px 7px;border-radius:999px;font-weight:700;font-size:11px;white-space:nowrap}
+    .ok{background:#dcfae6;color:#085d3a}.warn{background:#fff1cc;color:#7a4b00}.bad{background:#fee4e2;color:#912018}
+    .info{background:#e0ecff;color:#1849a9}.neutral{background:#eaecf0;color:#344054}
+    .chartgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+    canvas{width:100%;height:260px}.chartbox{height:310px}
+    .empty{padding:30px;text-align:center;color:var(--muted)}
+    .file-list{font-size:12px;margin-top:10px}.file-pill{display:inline-block;background:#eef4f8;padding:5px 8px;border-radius:999px;margin:3px}
+    .legend-box{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
+    .legend-box h3{font-size:14px;margin:0 0 10px}
+    .legend-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+    .legend-item{background:#f8fafc;border:1px solid #eaecf0;border-radius:10px;padding:11px}
+    .legend-item strong{display:block;margin-bottom:4px;color:#344054}
+    .legend-item span{font-size:12px;color:var(--muted);line-height:1.45}
+    .footer-note{margin-top:18px;font-size:11px;color:var(--muted)}
+    @media(max-width:850px){.upload-grid{grid-template-columns:1fr}.table-wrap{max-height:none}}
+    /* Dashboard: readable at normal zoom and on smaller screens. */
+    main{max-width:1440px;padding:24px}
+    .cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .metric{position:relative;min-width:0;padding:18px 42px 18px 18px}
+    .metric .label{font-size:11px;line-height:1.5;min-height:33px}
+    .metric .value{font-size:32px;color:var(--primary);margin:8px 0 4px}
+    .metric small{font-size:12px;line-height:1.4}
+    .metric-help{position:absolute;right:12px;top:14px;padding:0;width:24px;height:24px;border:1px solid var(--border);border-radius:50%;background:#f3f6f9;color:var(--primary);font-size:13px}
+    .metric-tip{display:none;position:absolute;top:calc(100% - 4px);left:0;width:320px;max-width:calc(100vw - 48px);padding:16px;background:#173f5f;color:#fff;border-radius:10px;box-shadow:0 8px 24px #17212b30;z-index:20;font-size:13px;line-height:1.6;font-weight:400;text-transform:none}
+    .metric:nth-child(4n) .metric-tip{left:auto;right:0}
+    .metric:hover,.metric:focus-within,.metric.tip-open{z-index:21}
+    .metric:hover .metric-tip,.metric:focus-within .metric-tip,.metric.tip-open .metric-tip{display:block}
+    .metric.tip-dismissed .metric-tip{display:none}
+    button:focus-visible,summary:focus-visible{outline:3px solid #539ad1;outline-offset:3px}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .comparison-help{padding:14px 18px;background:transparent;box-shadow:none}
+    .comparison-help summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--primary)}
+    .comparison-help[open] summary{margin-bottom:16px}
+    .chartgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+    .chartbox{height:auto;min-width:0;padding:22px}
+    .chartbox h2{font-size:16px;line-height:1.45;margin-bottom:8px}
+    .chartbox>.muted{line-height:1.6}
+    .bar-chart{margin-top:20px;display:grid;gap:16px}
+    .bar-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 16px}
+    .bar-label{font-size:13px;line-height:1.5;overflow-wrap:anywhere;color:#344054}
+    .bar-value{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--primary)}
+    .bar-track{grid-column:1/-1;height:10px;border-radius:5px;background:#edf2f7;overflow:hidden}
+    .bar-fill{height:100%;border-radius:5px;background:#20639b}
+    @media(max-width:850px){main{padding:16px}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.chartgrid{grid-template-columns:1fr}.metric:nth-child(even) .metric-tip{left:auto;right:0}}
+    @media(max-width:420px){.cards{grid-template-columns:1fr}.metric-tip{width:100%;left:0!important;right:auto!important}.metric .label{min-height:0}.chartbox{padding:18px}.toolbar input{min-width:0;width:100%}header{padding:20px}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Conferidor de Processos — SELIC</h1>
+  <p>Importe os arquivos, visualize o Dashboard em uma tela e faça a conferência detalhada em outra.</p>
+</header>
+
+<main>
+  <section class="grid upload-grid">
+    <div class="card">
+      <h2>1. Backup JSON</h2>
+      <div class="drop">
+        <strong>Selecione o backup_processos.json</strong>
+        <input id="jsonFile" type="file" accept=".json,application/json">
+      </div>
+      <div id="jsonStatus" class="statusline">Nenhum JSON carregado.</div>
+    </div>
+    <div class="card">
+      <h2>2. Relatórios SCPI-PROTOCOLO</h2>
+      <div class="drop">
+        <strong>Selecione um ou vários relatórios SCPI-PROTOCOLO</strong>
+        <div class="muted" style="font-size:12px;margin-top:5px">Ex.: Secretaria Executiva, Protocolo Geral e outros setores.</div>
+        <input id="txtFiles" type="file" accept=".txt,text/plain" multiple>
+      </div>
+      <div id="txtStatus" class="statusline">Nenhum Relatório SCPI-PROTOCOLO carregado.</div>
+      <div id="fileList" class="file-list"></div>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button id="analyzeBtn" class="primary">ANALISAR</button>
+    <button id="exportBtn" class="secondary" disabled>EXPORTAR TODAS — XLSX</button>
+    <button id="exportXlsBtn" class="secondary" disabled>EXPORTAR TODAS — XLS</button>
+    <button id="clearBtn" class="danger">LIMPAR</button>
+  </div>
+
+  <div class="mainnav">
+    <button class="navbtn active" data-screen="dashboardScreen">📊 Dashboard / Gráficos</button>
+    <button class="navbtn" data-screen="tablesScreen">📋 Tabelas / Conferência</button>
+  </div>
+
+  <section id="dashboardScreen" class="screen active">
+    <section id="summary" class="grid cards" style="margin-bottom:14px"></section>
+    <div class="card" style="margin-bottom:14px">
+      <h2>Dashboard geral</h2>
+      <div class="muted" style="font-size:12px">Visão consolidada dos processos da planilha, localização nos relatórios e distribuição por secretaria/modalidade.</div>
+    </div>
+
+    <details class="legend-box comparison-help">
+      <summary>Como o sistema faz a comparação</summary>
+      <div class="legend-grid">
+        <div class="legend-item"><strong>Encontrado diretamente</strong><span>O número do Processo da Planilha é igual ao Código + Exercício de um registro de algum Relatório SCPI-PROTOCOLO.</span></div>
+        <div class="legend-item"><strong>Encontrado indiretamente</strong><span>O Processo da Planilha não é o protocolo principal, mas o seu número aparece escrito dentro da descrição/DADOS de outro protocolo.</span></div>
+        <div class="legend-item"><strong>Divergência provável</strong><span>O sistema encontra o mesmo número-base com outro exercício e identifica semelhança entre o objeto da Planilha e a descrição do protocolo.</span></div>
+        <div class="legend-item"><strong>Descrição a conferir</strong><span>O mesmo número foi encontrado, porém a descrição do relatório tem pouca semelhança com o objeto registrado no JSON. O caso deve ser validado manualmente.</span></div>
+      </div>
+    </details>
+
+    <section id="dashboard" class="panel active">
+    <div class="chartgrid">
+      <div class="card chartbox"><h2>Situação dos Processos da Planilha</h2><div class="muted" style="font-size:12px;margin-bottom:8px">Compara cada Processo da Planilha com todos os Relatórios SCPI-PROTOCOLO e mostra quantos foram localizados diretamente, por vínculo indireto, possuem divergência ou não foram encontrados.</div><div id="statusChart" class="bar-chart"><div class="empty">Importe os arquivos e clique em Analisar.</div></div></div>
+      <div class="card chartbox"><h2>Localização por Relatório SCPI-PROTOCOLO/setor</h2><div id="sourceChart" class="bar-chart"><div class="empty">Importe os arquivos e clique em Analisar.</div></div></div>
+      <div class="card chartbox"><h2>Processos da Planilha por Secretaria</h2><div class="muted" style="font-size:12px;margin-bottom:8px">Distribuição dos Processos da Planilha conforme a secretaria cadastrada no backup JSON.</div><div id="secretariaChart" class="bar-chart"><div class="empty">Importe os arquivos e clique em Analisar.</div></div></div>
+      <div class="card chartbox"><h2>Processos da Planilha por Modalidade</h2><div class="muted" style="font-size:12px;margin-bottom:8px">Distribuição dos Processos da Planilha conforme a modalidade informada no backup JSON.</div><div id="modalidadeChart" class="bar-chart"><div class="empty">Importe os arquivos e clique em Analisar.</div></div></div>
+    </div>
+    </section>
+  </section>
+
+  <section id="tablesScreen" class="screen">
+    <div class="card" style="margin-bottom:14px">
+      <h2>Tabelas de conferência</h2>
+      <div class="muted" style="font-size:12px">Consulte os cruzamentos, vínculos, divergências e duplicidades encontradas.</div>
+    </div>
+
+    <div class="legend-box">
+      <h3>O que cada tabela mostra</h3>
+      <div class="legend-grid">
+        <div class="legend-item"><strong>Processos da Planilha</strong><span>Parte dos processos marcados como ativos no JSON e mostra onde cada um foi encontrado nos Relatórios SCPI-PROTOCOLO. É a principal tabela para conferir se o que está no seu controle também está corretamente localizado no SCPI.</span></div>
+        <div class="legend-item"><strong>Somente no sistema</strong><span>Lista protocolos presentes nos Relatórios SCPI-PROTOCOLO que não correspondem diretamente a nenhum Processo da Planilha. Ajuda a identificar registros que o SCPI ainda aponta para o setor, embora não estejam no seu controle atual.</span></div>
+        <div class="legend-item"><strong>Vínculos indiretos</strong><span>Mostra quando um Processo da Planilha é mencionado dentro de outro protocolo. A comparação é feita procurando o número do processo no texto/descrição dos protocolos.</span></div>
+        <div class="legend-item"><strong>Divergências</strong><span>Aponta possíveis inconsistências entre o JSON/Planilha e o SCPI, como exercício diferente ou descrição incompatível. Esses casos precisam de conferência manual.</span></div>
+        <div class="legend-item"><strong>Duplicidades JSON</strong><span>Mostra números de processo repetidos no backup JSON. O número é normalizado antes da comparação, ignorando diferenças de máscara.</span></div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="ativos">Processos da Planilha</button>
+      <button class="tab" data-tab="sistema">Somente no sistema</button>
+      <button class="tab" data-tab="vinculos">Vínculos indiretos</button>
+      <button class="tab" data-tab="divergencias">Divergências</button>
+      <button class="tab" data-tab="duplicados">Duplicidades JSON</button>
+    </div>
+
+  <section id="ativos" class="panel active">
+    <div class="card">
+      <h2>Processos da Planilha × Relatórios SCPI-PROTOCOLO</h2><div class="muted" style="font-size:12px;margin-bottom:10px">Para cada Processo da Planilha, o sistema procura o mesmo número em todos os relatórios importados e também verifica se ele aparece citado dentro de outro protocolo.</div>
+      <div class="toolbar">
+        <input id="activeSearch" placeholder="Pesquisar processo, objeto, secretaria, situação...">
+        <select id="activeFilter">
+          <option value="">Todas as situações</option>
+          <option value="localizados">Localizados (diretos ou por vínculo)</option>
+          <option>Localizado diretamente</option>
+          <option>Localizado indiretamente</option>
+          <option>Direto + vínculo indireto</option>
+          <option>Divergência provável</option>
+          <option>Não localizado</option>
+          <option>Descrição a conferir</option>
+        </select>
+      </div>
+      <div id="activeTable" class="table-wrap"></div>
+    </div>
+  </section>
+
+  <section id="sistema" class="panel">
+    <div class="card">
+      <h2>Protocolos presentes nos relatórios SCPI-PROTOCOLO que não constam na Planilha</h2>
+      <div class="toolbar"><input id="systemSearch" placeholder="Pesquisar protocolo, setor ou descrição..."></div>
+      <div id="systemTable" class="table-wrap"></div>
+    </div>
+  </section>
+
+  <section id="vinculos" class="panel">
+    <div class="card">
+      <h2>Processos da Planilha citados dentro de outros protocolos</h2><div class="muted" style="font-size:12px;margin-bottom:10px">Mostra relações indiretas: o processo não precisa ser o protocolo principal; basta estar mencionado na descrição/DADOS de outro protocolo.</div>
+      <div id="linksTable" class="table-wrap"></div>
+    </div>
+  </section>
+
+  <section id="divergencias" class="panel">
+    <div class="card">
+      <h2>Divergências e conferências sugeridas</h2><div class="muted" style="font-size:12px;margin-bottom:10px">Reúne situações que não podem ser consideradas corretas automaticamente e que precisam de validação antes de qualquer ajuste de tramitação no SCPI.</div>
+      <div id="divTable" class="table-wrap"></div>
+    </div>
+  </section>
+
+  <section id="duplicados" class="panel">
+    <div class="card">
+      <h2>Números duplicados no JSON</h2><div class="muted" style="font-size:12px;margin-bottom:10px">Identifica números de processo repetidos no backup JSON para facilitar a revisão de possíveis cadastros duplicados.</div>
+      <div id="dupTable" class="table-wrap"></div>
+    </div>
+  </section>
+
+  </section>
+
+  <div class="footer-note">
+    O cruzamento automático é uma ferramenta de conferência. Casos de similaridade de descrição ou exercício divergente devem ser validados antes de alterar tramitações no SCPI.
+  </div>
+</main>
+
+<script>
+const metricHelp = ["Quantidade de processos marcados como ativos no backup JSON. Essa é a base principal da conferência e representa os processos que, segundo o seu controle, estão atualmente no setor.","Quantidade de arquivos .txt importados do SCPI/Protocolo. Cada arquivo representa uma listagem de protocolos/processos atribuídos a determinado setor.","Processos da Planilha encontrados em pelo menos um Relatório SCPI-PROTOCOLO, seja diretamente pelo mesmo número ou indiretamente dentro da descrição de outro protocolo.","Processos da Planilha que não foram encontrados em nenhum relatório importado, nem como protocolo principal nem mencionados dentro da descrição de outro protocolo.","Casos em que o Processo da Planilha aparece citado dentro de outro protocolo. Exemplo: um protocolo de execução de ata que menciona o número do processo administrativo original.","Situações que precisam de conferência, como o mesmo número com exercício diferente ou o mesmo número localizado com uma descrição aparentemente incompatível com o objeto do processo.","Protocolos presentes no SCPI que não correspondem diretamente a nenhum Processo da Planilha. Podem ser processos já baixados, documentos auxiliares, protocolos relacionados ou registros que precisam de revisão.","Números de processo que aparecem mais de uma vez no backup JSON. Serve para identificar possíveis duplicidades de cadastro."];
+document.getElementById('summary').addEventListener('click',e=>{
+  const button=e.target.closest('.metric-help'); if(!button)return;
+  const card=button.closest('.metric');
+  const opened=card.classList.toggle('tip-open');
+  card.classList.toggle('tip-dismissed',!opened);
+});
+document.getElementById('summary').addEventListener('pointerover',e=>{const card=e.target.closest('.metric');if(card&&!card.contains(e.relatedTarget))card.classList.remove('tip-dismissed');});
+document.getElementById('summary').addEventListener('focusin',e=>e.target.closest('.metric')?.classList.remove('tip-dismissed'));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.metric').forEach(card=>{card.classList.remove('tip-open');card.classList.add('tip-dismissed');});});
+document.addEventListener('click',e=>{document.querySelectorAll('.metric').forEach(card=>{if(!card.contains(e.target)){card.classList.remove('tip-open');card.classList.add('tip-dismissed');}});});
+const state = { json: null, txtFiles: [], txtRecords: [], analysis: null };
+
+const STOP = new Set("DE DA DO DAS DOS E EM PARA POR COM A O AS OS UM UMA NO NA NOS NAS AO AOS QUE SE SER REFERENTE AQUISICAO CONTRATACAO REGISTRO PRECOS PROCESSO MUNICIPIO CORUMBA MS".split(" "));
+
+function normText(s=""){
+  return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9\s]/g," ").replace(/\s+/g," ").trim();
+}
+function normalizeProcess(s, fallbackYear=""){
+  if(s===null || s===undefined) return "";
+  let t=String(s).trim().replace(/\s/g,"");
+  t=t.replace(/\./g,"");
+  let m=t.match(/^(\d{1,7})\/(\d{2,4})$/);
+  if(!m){
+    let only=t.replace(/\D/g,"");
+    if(only && fallbackYear) return `${parseInt(only,10)}/${fallbackYear}`;
+    return "";
+  }
+  let y=m[2]; if(y.length===2) y="20"+y;
+  return `${parseInt(m[1],10)}/${y}`;
+}
+function displayProcess(key){
+  let m=String(key).match(/^(\d+)\/(\d{4})$/); if(!m) return key;
+  return Number(m[1]).toLocaleString("pt-BR")+ "/" + m[2];
+}
+function processCode(key){ return (key.split("/")[0]||"").replace(/^0+/,""); }
+function tokens(s){
+  return new Set(normText(s).split(" ").filter(x=>x.length>2 && !STOP.has(x)));
+}
+function similarity(a,b){
+  const A=tokens(a), B=tokens(b); if(!A.size || !B.size) return 0;
+  let inter=0; A.forEach(x=>{if(B.has(x)) inter++});
+  return inter / Math.max(1, Math.min(A.size,B.size));
+}
+function escapeHtml(s=""){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));
+}
+function detectSource(text, filename){
+  const h=normText(text.slice(0,5000));
+  if(h.includes("PROTOCOLO GERAL")) return "PROTOCOLO GERAL";
+  if(h.includes("SECRETARIA EXECUTIVA")) return "SECRETARIA EXECUTIVA";
+  return filename.replace(/\.txt$/i,"");
+}
+function extractProcessRefs(block){
+  const refs = new Set();
+  const re=/(?:PROCESSO(?:\s+ADMINISTRATIVO|\s+LICITATORIO)?(?:\s*(?:N[º°O.]*)|\s*:)?\s*)(\d{1,7}(?:\.\d{3})*\/\d{2,4})/gi;
+  let m;
+  while((m=re.exec(block))!==null){
+    const k=normalizeProcess(m[1]); if(k) refs.add(k);
+  }
+  return [...refs];
+}
+function parseTxt(text, filename){
+  text=text.replace(/^\uFEFF/,"");
+  const source=detectSource(text,filename);
+  const lines=text.split(/\r?\n/);
+  const starts=[];
+  const re=/^\s*(\d{1,7})\s+(\d{4})\s+(\d{2}\/\d{2}\/\d{4})(.*)$/;
+  lines.forEach((line,i)=>{ const m=line.match(re); if(m) starts.push({i,m}); });
+  const out=[];
+  for(let n=0;n<starts.length;n++){
+    const s=starts[n], end=(n+1<starts.length?starts[n+1].i:lines.length);
+    const block=lines.slice(s.i,end).join("\n").trim();
+    const code=s.m[1], year=s.m[2], date=s.m[3];
+    out.push({
+      key:normalizeProcess(`${code}/${year}`), code, year, date,
+      source, filename, block, description:block.replace(/\s+/g," ").trim(),
+      refs:extractProcessRefs(block)
+    });
+  }
+  return out;
+}
+function statusBadge(status){
+  const cls = status==="Localizado diretamente" ? "ok" :
+              status==="Direto + vínculo indireto" ? "ok" :
+              status==="Localizado indiretamente" ? "info" :
+              status==="Divergência provável" ? "warn" :
+              status==="Descrição a conferir" ? "warn" : "bad";
+  return `<span class="badge ${cls}">${escapeHtml(status)}</span>`;
+}
+
+document.getElementById("jsonFile").addEventListener("change", async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(!Array.isArray(data)) throw new Error("O JSON precisa conter uma lista de processos.");
+    state.json=data;
+    const active=data.filter(x=>x.ativo===true).length;
+    document.getElementById("jsonStatus").textContent=`${f.name}\n${data.length} registros • ${active} ativos • ${data.length-active} inativos`;
+  }catch(err){
+    state.json=null; document.getElementById("jsonStatus").textContent="Erro ao ler JSON: "+err.message;
+  }
+});
+
+document.getElementById("txtFiles").addEventListener("change", async e=>{
+  state.txtFiles=[...e.target.files];
+  const pills=state.txtFiles.map(f=>`<span class="file-pill">${escapeHtml(f.name)}</span>`).join("");
+  document.getElementById("fileList").innerHTML=pills;
+  document.getElementById("txtStatus").textContent=state.txtFiles.length ? `${state.txtFiles.length} arquivo(s) selecionado(s).` : "Nenhum Relatório SCPI-PROTOCOLO carregado.";
+});
+
+document.getElementById("clearBtn").addEventListener("click",()=>{
+  state.json=null;state.txtFiles=[];state.txtRecords=[];state.analysis=null;
+  document.getElementById("jsonFile").value=""; document.getElementById("txtFiles").value="";
+  document.getElementById("jsonStatus").textContent="Nenhum JSON carregado.";
+  document.getElementById("txtStatus").textContent="Nenhum Relatório SCPI-PROTOCOLO carregado.";
+  document.getElementById("fileList").innerHTML=""; document.getElementById("summary").innerHTML="";
+  ["activeTable","systemTable","linksTable","divTable","dupTable"].forEach(id=>document.getElementById(id).innerHTML="");
+  document.getElementById("exportBtn").disabled=true;
+  ["statusChart","sourceChart","secretariaChart","modalidadeChart"].forEach(id=>clearCanvas(id));
+});
+
+document.getElementById("analyzeBtn").addEventListener("click", async ()=>{
+  if(!state.json){alert("Importe o arquivo JSON.");return}
+  if(!state.txtFiles.length){alert("Importe pelo menos um Relatório SCPI-PROTOCOLO.");return}
+  state.txtRecords=[];
+  for(const f of state.txtFiles){
+    try{ state.txtRecords.push(...parseTxt(await f.text(),f.name)); }catch(e){ console.error(e); }
+  }
+  state.analysis=runAnalysis(state.json,state.txtRecords);
+  renderAll();
+  document.getElementById("exportBtn").disabled=false;
+});
+
+function runAnalysis(json, txt){
+  const normalizedJson=json.map((x,idx)=>({...x,_idx:idx,key:normalizeProcess(x.numero)}));
+  const active=normalizedJson.filter(x=>x.ativo===true);
+  const activeKeys=new Set(active.map(x=>x.key).filter(Boolean));
+  const byKey=new Map(); txt.forEach(r=>{if(!byKey.has(r.key))byKey.set(r.key,[]);byKey.get(r.key).push(r)});
+  const refsTo=new Map();
+  txt.forEach(r=>r.refs.forEach(k=>{ if(!refsTo.has(k))refsTo.set(k,[]); refsTo.get(k).push(r); }));
+
+  const activeRows=active.map(p=>{
+    const direct=byKey.get(p.key)||[];
+    const indirect=(refsTo.get(p.key)||[]).filter(r=>r.key!==p.key);
+    let divergence=[];
+    if(!direct.length){
+      divergence=txt.filter(r=>processCode(r.key)===processCode(p.key) && r.key!==p.key)
+        .map(r=>({...r,sim:similarity(p.objeto,r.description)}))
+        .filter(r=>r.sim>=0.12).sort((a,b)=>b.sim-a.sim);
+    }
+    let descCheck=false;
+    if(direct.length){
+      const best=Math.max(...direct.map(r=>similarity(p.objeto,r.description)));
+      descCheck=best<0.08;
+    }
+    let status;
+    if(direct.length && indirect.length) status="Direto + vínculo indireto";
+    else if(direct.length && descCheck) status="Descrição a conferir";
+    else if(direct.length) status="Localizado diretamente";
+    else if(indirect.length) status="Localizado indiretamente";
+    else if(divergence.length) status="Divergência provável";
+    else status="Não localizado";
+    return {p,direct,indirect,divergence,status};
+  });
+
+  const systemOnly=txt.filter(r=>!activeKeys.has(r.key));
+  const links=[];
+  txt.forEach(r=>r.refs.forEach(k=>{
+    if(activeKeys.has(k) && r.key!==k){
+      const p=active.find(x=>x.key===k);
+      links.push({process:p,protocol:r});
+    }
+  }));
+
+  const groups=new Map();
+  normalizedJson.forEach(p=>{if(!p.key)return;if(!groups.has(p.key))groups.set(p.key,[]);groups.get(p.key).push(p)});
+  const duplicates=[...groups.entries()].filter(([k,v])=>v.length>1).map(([key,items])=>({key,items}));
+
+  const divergences=[];
+  activeRows.forEach(x=>{
+    if(x.status==="Divergência provável"){
+      x.divergence.forEach(r=>divergences.push({type:"Exercício/número divergente",process:x.p,record:r,note:`Possível correspondência: ${displayProcess(r.key)} • similaridade ${Math.round(r.sim*100)}%`}));
+    }
+    if(x.status==="Descrição a conferir"){
+      x.direct.forEach(r=>divergences.push({type:"Descrição a conferir",process:x.p,record:r,note:"Mesmo número localizado, porém a descrição apresenta baixa similaridade com o objeto do JSON."}));
+    }
+    if(!x.p.key) divergences.push({type:"Número inválido no JSON",process:x.p,record:null,note:`Número cadastrado: ${x.p.numero||""}`});
+  });
+
+  return {normalizedJson,active,activeRows,systemOnly,links,duplicates,divergences,txt};
+}
+
+function renderAll(){
+  renderSummary();renderActiveTable();renderSystemTable();renderLinks();renderDivergences();renderDuplicates();renderCharts();
+}
+function renderSummary(){
+  const a=state.analysis, counts={};
+  a.activeRows.forEach(x=>counts[x.status]=(counts[x.status]||0)+1);
+  const cards=[
+    ["Processos da Planilha",a.active.length,"JSON"],
+    ["Relatórios SCPI-PROTOCOLO",state.txtFiles.length,`${a.txt.length} protocolos lidos`],
+    ["Localizados",a.activeRows.filter(x=>!["Não localizado","Divergência provável"].includes(x.status)).length,"diretos ou por vínculo"],
+    ["Não localizados",counts["Não localizado"]||0,"requer conferência"],
+    ["Vínculos indiretos",a.links.length,"citações em outros protocolos"],
+    ["Divergências",a.divergences.length,"sugestões automáticas"],
+    ["Somente nos Relatórios SCPI-PROTOCOLO",a.systemOnly.length,"não são ativos no JSON"],
+    ["Duplicados JSON",a.duplicates.length,"números repetidos"]
+  ];
+  document.getElementById("summary").innerHTML=cards.map((c,i)=>`<div class="card metric"><button type="button" class="metric-go" data-metric="${i}" aria-label="Ver tabela: ${escapeHtml(c[0])}"><div class="label">${c[0]}</div><div class="value">${c[1]}</div><small>${c[2]}</small></button><button type="button" class="metric-help" aria-label="Sobre ${escapeHtml(c[0])}" aria-describedby="metric-tip-${i}">?</button><div class="metric-tip" role="tooltip" id="metric-tip-${i}">${metricHelp[i]}</div></div>`).join("");
+}
+function tableHtml(headers,rows){
+  if(!rows.length)return `<div class="empty">Nenhum registro.</div>`;
+  return `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+}
+function activeRowHtml(x){
+  const p=x.p;
+  const direct=x.direct.map(r=>`${escapeHtml(r.source)} (${displayProcess(r.key)})`).join("<br>");
+  const indirect=x.indirect.map(r=>`${escapeHtml(r.source)} → protocolo ${displayProcess(r.key)}`).join("<br>");
+  const div=x.divergence.slice(0,3).map(r=>`${escapeHtml(r.source)}: ${displayProcess(r.key)}`).join("<br>");
+  return `<tr data-search="${escapeHtml(normText([p.numero,p.objeto,p.secretaria,p.modalidade,p.andamento,x.status,direct,indirect,div].join(" ")))}" data-status="${escapeHtml(x.status)}">
+    <td class="nowrap"><strong>${escapeHtml(displayProcess(p.key)||p.numero||"")}</strong></td>
+    <td>${escapeHtml(p.objeto||"")}</td><td>${escapeHtml(p.secretaria||"")}</td>
+    <td>${escapeHtml(p.modalidade||"")}</td><td>${escapeHtml(p.andamento||"")}</td>
+    <td>${statusBadge(x.status)}</td>
+    <td>${direct||'<span class="muted">—</span>'}</td>
+    <td>${indirect||'<span class="muted">—</span>'}</td>
+    <td>${div||'<span class="muted">—</span>'}</td>
+  </tr>`;
+}
+function renderActiveTable(){
+  const rows=state.analysis.activeRows.map(activeRowHtml);
+  document.getElementById("activeTable").innerHTML=tableHtml(["Processo","Objeto","Secretaria","Modalidade","Andamento","Situação","Encontrado diretamente","Vínculo indireto","Possível divergência"],rows);
+  filterActive();
+}
+function renderSystemTable(){
+  const rows=state.analysis.systemOnly.map(r=>`<tr data-search="${escapeHtml(normText([r.key,r.source,r.description].join(" ")))}">
+    <td class="nowrap"><strong>${displayProcess(r.key)}</strong></td><td>${escapeHtml(r.source)}</td><td class="nowrap">${escapeHtml(r.date)}</td>
+    <td>${escapeHtml(r.description.slice(0,900))}</td>
+    <td>${r.refs.length?r.refs.map(displayProcess).join(", "):'<span class="muted">—</span>'}</td></tr>`);
+  document.getElementById("systemTable").innerHTML=tableHtml(["Protocolo","Relatório SCPI-PROTOCOLO / Setor","Data","Descrição","Processos citados"],rows);
+  filterSystem();
+}
+function renderLinks(){
+  const rows=state.analysis.links.map(x=>`<tr><td><strong>${displayProcess(x.process.key)}</strong></td><td>${escapeHtml(x.process.objeto||"")}</td>
+    <td>${displayProcess(x.protocol.key)}</td><td>${escapeHtml(x.protocol.source)}</td><td>${escapeHtml(x.protocol.description.slice(0,900))}</td></tr>`);
+  document.getElementById("linksTable").innerHTML=tableHtml(["Processo da Planilha","Objeto","Protocolo que o cita","Relatório SCPI-PROTOCOLO / Setor","Descrição do protocolo"],rows);
+}
+function renderDivergences(){
+  const rows=state.analysis.divergences.map(x=>`<tr><td><span class="badge warn">${escapeHtml(x.type)}</span></td>
+    <td><strong>${escapeHtml(displayProcess(x.process.key)||x.process.numero||"")}</strong></td><td>${escapeHtml(x.process.objeto||"")}</td>
+    <td>${x.record?displayProcess(x.record.key):"—"}</td><td>${x.record?escapeHtml(x.record.source):"—"}</td><td>${escapeHtml(x.note)}</td></tr>`);
+  document.getElementById("divTable").innerHTML=tableHtml(["Tipo","Processo JSON","Objeto","Registro Relatório SCPI-PROTOCOLO","Setor","Observação"],rows);
+}
+function renderDuplicates(){
+  const rows=[];
+  state.analysis.duplicates.forEach(g=>g.items.forEach((p,i)=>rows.push(`<tr><td><strong>${displayProcess(g.key)}</strong></td><td>${i+1}</td><td>${escapeHtml(p.objeto||"")}</td>
+    <td>${escapeHtml(p.secretaria||"")}</td><td>${escapeHtml(p.andamento||"")}</td><td>${p.ativo?'<span class="badge ok">Ativo</span>':'<span class="badge neutral">Inativo</span>'}</td></tr>`)));
+  document.getElementById("dupTable").innerHTML=tableHtml(["Processo","Ocorrência","Objeto","Secretaria","Andamento","Status"],rows);
+}
+
+document.getElementById("activeSearch").addEventListener("input",filterActive);
+document.getElementById("activeFilter").addEventListener("change",filterActive);
+function filterActive(){
+  const q=normText(document.getElementById("activeSearch").value), st=document.getElementById("activeFilter").value;
+  document.querySelectorAll("#activeTable tbody tr").forEach(tr=>{
+    const okQ=!q||tr.dataset.search.includes(q), okS=!st||(st==="localizados"?!["Não localizado","Divergência provável"].includes(tr.dataset.status):tr.dataset.status===st); tr.style.display=(okQ&&okS)?"":"none";
+  });
+}
+document.getElementById("systemSearch").addEventListener("input",filterSystem);
+function filterSystem(){
+  const q=normText(document.getElementById("systemSearch").value);
+  document.querySelectorAll("#systemTable tbody tr").forEach(tr=>tr.style.display=(!q||tr.dataset.search.includes(q))?"":"none");
+}
+
+document.querySelectorAll(".navbtn").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll(".navbtn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(btn.dataset.screen).classList.add("active");
+  if(btn.dataset.screen==="dashboardScreen" && state.analysis){
+    setTimeout(renderCharts,50);
+  }
+}));
+
+document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll("#tablesScreen .tab").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll("#tablesScreen .panel").forEach(p=>p.classList.remove("active"));
+  document.getElementById(btn.dataset.tab).classList.add("active");
+}));
+
+function clearCanvas(id){document.getElementById(id).innerHTML='<div class="empty">Importe os arquivos e clique em Analisar.</div>'}
+function drawBars(id, labels, values){
+  const chart=document.getElementById(id),max=Math.max(1,...values);
+  if(!labels.length){chart.innerHTML='<div class="empty">Nenhum registro para exibir.</div>';return;}
+  chart.innerHTML=labels.map((label,i)=>`<div class="bar-row"><span class="bar-label">${escapeHtml(label)}</span><span class="bar-value">${values[i].toLocaleString('pt-BR')}</span><div class="bar-track" aria-hidden="true"><div class="bar-fill" style="width:${values[i]/max*100}%"></div></div></div>`).join('');
+}
+function aggregate(list, fn){
+  const m=new Map(); list.forEach(x=>{const k=fn(x)||"Não informado";m.set(k,(m.get(k)||0)+1)});
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]);
+}
+function renderCharts(){
+  const a=state.analysis;
+  let ag=aggregate(a.activeRows,x=>x.status); drawBars("statusChart",ag.map(x=>x[0]),ag.map(x=>x[1]));
+  const loc=[];
+  a.activeRows.forEach(x=>{
+    const sources=new Set([...x.direct,...x.indirect].map(r=>r.source)); if(!sources.size)sources.add("Não localizado");
+    sources.forEach(s=>loc.push(s));
+  });
+  ag=aggregate(loc,x=>x); drawBars("sourceChart",ag.map(x=>x[0]),ag.map(x=>x[1]));
+  ag=aggregate(a.active,x=>x.secretaria); drawBars("secretariaChart",ag.map(x=>x[0]),ag.map(x=>x[1]));
+  ag=aggregate(a.active,x=>x.modalidade); drawBars("modalidadeChart",ag.map(x=>x[0]),ag.map(x=>x[1]));
+}
+
+function aoaFromActive(){
+  return [["Processo","Objeto","Secretaria","Valor","Andamento","Modalidade","Data","Responsável","Situação","Encontrado diretamente","Vínculos indiretos","Divergência sugerida"],
+    ...state.analysis.activeRows.map(x=>[
+      displayProcess(x.p.key)||x.p.numero,x.p.objeto||"",x.p.secretaria||"",x.p.valor||"",x.p.andamento||"",x.p.modalidade||"",x.p.data||"",x.p.responsavel||"",
+      x.status,x.direct.map(r=>`${r.source}: ${displayProcess(r.key)}`).join(" | "),
+      x.indirect.map(r=>`${r.source}: protocolo ${displayProcess(r.key)}`).join(" | "),
+      x.divergence.map(r=>`${r.source}: ${displayProcess(r.key)}`).join(" | ")
+    ])];
+}
+function aoaSystem(){
+  return [["Protocolo","Relatório SCPI-PROTOCOLO / Setor","Arquivo","Data","Descrição","Processos citados"],
+    ...state.analysis.systemOnly.map(r=>[displayProcess(r.key),r.source,r.filename,r.date,r.description,r.refs.map(displayProcess).join(", ")])];
+}
+function aoaLinks(){
+  return [["Processo da Planilha","Objeto","Protocolo relacionado","Relatório SCPI-PROTOCOLO / Setor","Arquivo","Descrição"],
+    ...state.analysis.links.map(x=>[displayProcess(x.process.key),x.process.objeto||"",displayProcess(x.protocol.key),x.protocol.source,x.protocol.filename,x.protocol.description])];
+}
+function aoaDiv(){
+  return [["Tipo","Processo JSON","Objeto","Registro Relatório SCPI-PROTOCOLO","Relatório SCPI-PROTOCOLO / Setor","Observação"],
+    ...state.analysis.divergences.map(x=>[x.type,displayProcess(x.process.key)||x.process.numero,x.process.objeto||"",x.record?displayProcess(x.record.key):"",x.record?x.record.source:"",x.note])];
+}
+function aoaDup(){
+  const rows=[["Processo","Objeto","Secretaria","Andamento","Ativo"]];
+  state.analysis.duplicates.forEach(g=>g.items.forEach(p=>rows.push([displayProcess(g.key),p.objeto||"",p.secretaria||"",p.andamento||"",p.ativo?"SIM":"NÃO"])));
+  return rows;
+}
+function setWidths(ws, widths){ ws["!cols"]=widths.map(w=>({wch:w})); }
+function exportAll(format="xlsx"){
+  if(!state.analysis)return;
+  if(typeof XLSX==="undefined"){alert("A biblioteca de exportação XLSX não foi carregada. Verifique sua conexão com a internet e reabra o sistema.");return}
+  const wb=XLSX.utils.book_new();
+  const counts=aggregate(state.analysis.activeRows,x=>x.status);
+  const summary=[
+    ["RELATÓRIO DE CONFERÊNCIA DE PROCESSOS - SELIC"],[],
+    ["Indicador","Quantidade"],
+    ["Registros no JSON",state.analysis.normalizedJson.length],
+    ["Processos da Planilha",state.analysis.active.length],
+    ["Relatórios SCPI-PROTOCOLO",state.txtFiles.length],
+    ["Protocolos lidos nos Relatórios SCPI-PROTOCOLO",state.analysis.txt.length],
+    ["Somente nos Relatórios SCPI-PROTOCOLO",state.analysis.systemOnly.length],
+    ["Vínculos indiretos",state.analysis.links.length],
+    ["Divergências",state.analysis.divergences.length],
+    ["Duplicidades no JSON",state.analysis.duplicates.length],[],
+    ["Situação dos ativos","Quantidade"],...counts
+  ];
+  let ws=XLSX.utils.aoa_to_sheet(summary); setWidths(ws,[38,18]); XLSX.utils.book_append_sheet(wb,ws,"Resumo");
+  ws=XLSX.utils.aoa_to_sheet(aoaFromActive()); setWidths(ws,[18,55,28,16,32,25,14,20,25,38,42,36]); ws["!autofilter"]={ref:ws["!ref"]}; XLSX.utils.book_append_sheet(wb,ws,"Processos da Planilha");
+  ws=XLSX.utils.aoa_to_sheet(aoaSystem()); setWidths(ws,[18,25,28,14,90,35]); ws["!autofilter"]={ref:ws["!ref"]}; XLSX.utils.book_append_sheet(wb,ws,"Somente Sistema");
+  ws=XLSX.utils.aoa_to_sheet(aoaLinks()); setWidths(ws,[18,55,20,25,28,90]); ws["!autofilter"]={ref:ws["!ref"]}; XLSX.utils.book_append_sheet(wb,ws,"Vínculos Indiretos");
+  ws=XLSX.utils.aoa_to_sheet(aoaDiv()); setWidths(ws,[24,18,55,18,25,70]); ws["!autofilter"]={ref:ws["!ref"]}; XLSX.utils.book_append_sheet(wb,ws,"Divergências");
+  ws=XLSX.utils.aoa_to_sheet(aoaDup()); setWidths(ws,[18,55,28,35,10]); ws["!autofilter"]={ref:ws["!ref"]}; XLSX.utils.book_append_sheet(wb,ws,"Duplicidades JSON");
+  const d=new Date(), stamp=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  const reportSheet=XLSX.utils.aoa_to_sheet(aoaReports());
+  setWidths(reportSheet,[18,25,28,14,90,35]); XLSX.utils.book_append_sheet(wb,reportSheet,"Relatórios SCPI");
+  writeWorkbook(wb,`Relatorio_Conferencia_Processos_${stamp}`,format);
+}
+document.getElementById("exportBtn").addEventListener("click",()=>exportAll("xlsx"));
+</script>
+<script src="melhorias.js"></script>
+</body>
+</html>
+
