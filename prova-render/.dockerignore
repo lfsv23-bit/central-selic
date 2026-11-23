@@ -1,0 +1,9 @@
+tests
+__pycache__
+*.pyc
+*.sqlite*
+data
+cache
+downloads
+.env
+vendor
