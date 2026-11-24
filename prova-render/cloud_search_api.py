@@ -102,20 +102,17 @@ class Handler(BaseHTTPRequestHandler):
             with app.LOCK: edition=app.JOURNAL_EDITIONS.get(key)
             if not edition:return self.reply(404,{'error':'Edição não encontrada.'})
             try:
-                data=sources.cached_pdf(edition['url'],app.fetch)
                 content_type='application/pdf'
                 if '/page/' in path:
                     page=int(urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get('page',['1'])[0])
-                    import pypdfium2 as pdfium
-                    with sources.PDF_LOCK:
-                        doc=pdfium.PdfDocument(data)
-                        try:
-                            if page<1 or page>len(doc):raise ValueError('Página inválida.')
-                            pdfpage=doc[page-1]
-                            try: image=pdfpage.render(scale=1.5).to_pil()
-                            finally: pdfpage.close()
-                        finally: doc.close()
+                    with sources.journal_preview_pdf(edition['url'],app.fetch) as doc:
+                        if page<1 or page>len(doc):raise ValueError('Página inválida.')
+                        pdfpage=doc[page-1]
+                        try: image=pdfpage.render(scale=1.5).to_pil()
+                        finally: pdfpage.close()
                     output=io.BytesIO();image.save(output,format='PNG');data=output.getvalue();content_type='image/png'
+                else:
+                    data=sources.cached_pdf(edition['url'],app.fetch)
                 self.send_response(200);self.send_header('Content-Type',content_type)
                 self.send_header('Content-Length',str(len(data)));self.send_header('Cache-Control','no-store')
                 if self.headers.get('Origin')==ALLOWED_ORIGIN:
@@ -214,8 +211,9 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path=='/api/journal/preview':
                 with app.LOCK:edition=app.JOURNAL_EDITIONS.get(data.get('edition_id'))
                 if not edition:raise ValueError('Edição não encontrada.')
-                from pypdf import PdfReader
-                return self.reply(200,{'pages':len(PdfReader(io.BytesIO(sources.cached_pdf(edition['url'],app.fetch))).pages)})
+                with sources.journal_preview_pdf(edition['url'],app.fetch) as doc:
+                    pages=len(doc)
+                return self.reply(200,{'pages':pages})
             elif self.path=='/api/dou':
                 source=jobs.get(identity.user_id,data.get('search_id',''))
                 if source.get('status')!='done' or 'results' not in source:raise ValueError('Conclua a pesquisa.')

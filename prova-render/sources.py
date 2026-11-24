@@ -1,12 +1,55 @@
 """Consultas públicas por fonte; limites e falhas nunca equivalem a zero resultados."""
 from datetime import date, timedelta
 import hashlib, html, io, json, re, threading, urllib.parse, urllib.error, subprocess, uuid, os
+from contextlib import contextmanager
 from catalog import MODALITIES
 from pathlib import Path
 
 NAMES = {'corumba':'Diário de Corumbá', 'estado':'Diário do Estado · MS', 'jornal':'Jornal O Estado', 'uniao':'Diário da União', 'pncp':'PNCP'}
 PDF_LOCK = threading.Lock()  # PDFium não é seguro em threads concorrentes.
 CACHE = Path(__file__).parent / 'cache'
+_preview_url = None
+_preview_stream = None
+
+@contextmanager
+def journal_preview_pdf(url, fetch):
+    """Abre somente os trechos necessários quando a fonte aceita Range.
+
+    PDF_LOCK protege tanto o PDFium quanto a posição do fluxo compartilhado.
+    Apenas uma edição pública é mantida em memória por vez.
+    """
+    global _preview_url, _preview_stream
+    import pypdfium2 as pdfium
+    import range_pdf
+    with PDF_LOCK:
+        cached = CACHE / (hashlib.sha256(url.encode()).hexdigest() + '.pdf')
+        if cached.exists():
+            source = cached_pdf(url, fetch)
+        else:
+            if _preview_url != url or _preview_stream is None:
+                try:
+                    _preview_stream = range_pdf.RangePDF(url)
+                    _preview_url = url
+                except (OSError, ValueError):
+                    _preview_url = _preview_stream = None
+                    source = cached_pdf(url, fetch)
+                else:
+                    source = _preview_stream
+            else:
+                source = _preview_stream
+            if source is _preview_stream and _preview_stream is not None:
+                source.seek(0)
+        try:
+            doc = pdfium.PdfDocument(source)
+            try:
+                yield doc
+            finally:
+                doc.close()
+            if source is _preview_stream and source.error is not None:
+                raise source.error
+        except Exception:
+            _preview_url = _preview_stream = None
+            raise
 
 def ocr_page(data, index):
     import pypdfium2 as pdfium
