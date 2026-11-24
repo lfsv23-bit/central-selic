@@ -35,7 +35,14 @@ class SafeRedirect(urllib.request.HTTPRedirectHandler):
 
 @lru_cache(maxsize=1)
 def context():
-    return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    # O servidor do jornal não envia o intermediário da própria cadeia.
+    # Este certificado público é da GlobalSign; a validação continua exigindo
+    # uma raiz confiável do sistema e o nome correto do servidor.
+    ctx.load_verify_locations(cafile=str(Path(__file__).with_name('globalsign-intermediate.pem')))
+    if hasattr(ssl, 'VERIFY_X509_PARTIAL_CHAIN'):
+        ctx.verify_flags &= ~ssl.VERIFY_X509_PARTIAL_CHAIN
+    return ctx
 
 def urlopen(request,timeout=45):
     validate_url(request.full_url if hasattr(request, 'full_url') else request)
