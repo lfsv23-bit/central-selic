@@ -1,0 +1,16 @@
+/* Base CATMAT pública: leitura local no navegador; nenhum lote é enviado aqui. */
+let archivePromise=null,cacheQuery='',cacheRows=[],cacheTotal=0;
+function normalized(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
+function fields(line){let out=[],v='',quoted=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(quoted&&line[i+1]==='"'){v+='"';i++}else quoted=!quoted}else if(c===';'&&!quoted){out.push(v);v=''}else v+=c}out.push(v);return out}
+function keepBest(heap,row){const value=Number(row.codigoItem);if(heap.length<10000){heap.push(row);let i=heap.length-1;while(i>0){const p=(i-1)>>1;if(Number(heap[p].codigoItem)>=value)break;heap[i]=heap[p];i=p}heap[i]=row;return}if(value>=Number(heap[0].codigoItem))return;let i=0;while(true){let child=i*2+1;if(child>=heap.length)break;if(child+1<heap.length&&Number(heap[child+1].codigoItem)>Number(heap[child].codigoItem))child++;if(Number(heap[child].codigoItem)<=value)break;heap[i]=heap[child];i=child}heap[i]=row}
+async function scan(query,id){
+ const words=normalized(query).split(/\s+/).filter(w=>w&&!['de','da','do','das','dos','em','com','para'].includes(w));if(!words.length)return {items:[],total:0,offset:0,base:'30/09/2026'};
+ if(!archivePromise){postMessage({id,progress:'Carregando a base CATMAT no navegador pela primeira vez…'});archivePromise=fetch('catmat-itens.csv.gz').then(r=>{if(!r.ok)throw Error('Não foi possível carregar a base CATMAT.');return r.blob()}).catch(e=>{archivePromise=null;throw e})}
+ const archive=await archivePromise;if(typeof DecompressionStream!=='function')throw Error('Este navegador não suporta a consulta. Atualize o Firefox, Chrome ou Edge.');
+ postMessage({id,progress:'Pesquisando os itens da base CATMAT…'});
+ const reader=archive.stream().pipeThrough(new DecompressionStream('gzip')).pipeThrough(new TextDecoderStream('utf-8')).getReader();let tail='',header=null,heap=[],total=0;
+ function processLine(line){if(!line)return;if(!header){header=fields(line.replace(/^\uFEFF/,''));return}const f=fields(line);if(f.length!==header.length)return;const status=f[8];if(status.toLowerCase()!=='true')return;const text=normalized(f[7]+' '+f[6]+' '+f[0]);if(!words.every(w=>text.includes(w)))return;const row={};for(let i=0;i<header.length;i++)row[header[i]]=f[i];total++;keepBest(heap,row)}
+ for(;;){const {value,done}=await reader.read();if(done)break;const lines=(tail+value).split(/\r?\n/);tail=lines.pop();for(const line of lines)processLine(line)}if(tail)processLine(tail);
+ heap.sort((a,b)=>Number(a.codigoItem)-Number(b.codigoItem));cacheQuery=words.join(' ');cacheRows=heap;cacheTotal=total;
+}
+self.onmessage=async event=>{const {id,q,offset}=event.data;try{if(typeof q!=='string'||q.length<2||q.length>200||!Number.isInteger(offset)||offset<0||offset>=10000)throw Error('Consulta inválida.');const key=normalized(q).split(/\s+/).filter(w=>w&&!['de','da','do','das','dos','em','com','para'].includes(w)).join(' ');if(key!==cacheQuery)await scan(q,id);postMessage({id,result:{items:cacheRows.slice(offset,offset+20),total:Math.min(cacheTotal,10000),total_real:cacheTotal,offset,base:'30/09/2026'}})}catch(error){postMessage({id,error:error.message||'Falha na consulta CATMAT.'})}};

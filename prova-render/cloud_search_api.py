@@ -91,24 +91,12 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def do_GET(self):
-        if self.path == '/health':
-            import cadastro_materials
-            return self.reply(200, {'status':'ok','cadastro_catmat':cadastro_materials.BASE.is_file()})
-        if self.path == '/':
+        if self.path in ('/', '/health'):
             return self.reply(200, {'status':'ok'})
         identity = self.identity()
         if not identity:
             return
         path=urllib.parse.urlparse(self.path).path
-        if path == '/api/cadastro/materials':
-            try:
-                import cadastro_materials
-                query=urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-                return self.reply(200,cadastro_materials.search(query.get('q',[''])[0].strip(),int(query.get('offset',['0'])[0])))
-            except (ValueError,TypeError):
-                return self.reply(400,{'error':'Consulta inválida.'})
-            except Exception:
-                return self.reply(503,{'error':'Base CATMAT temporariamente indisponível.'})
         if path.startswith('/api/journal/pdf/') or path.startswith('/api/journal/page/'):
             key=path.rsplit('/',1)[-1]
             with app.LOCK: edition=app.JOURNAL_EDITIONS.get(key)

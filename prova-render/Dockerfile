@@ -5,7 +5,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends libreoffice-wri
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt && python -m playwright install --with-deps chromium
 COPY . /app
-RUN cat /app/catmat-index.part1 /app/catmat-index.part2 | gzip -dc > /app/catmat.sqlite && rm /app/catmat-index.part1 /app/catmat-index.part2
 RUN useradd -m -u 10001 central && mkdir -p /app/data /app/downloads /app/cache && chown -R central:central /app
 USER central
 CMD ["python", "/app/cloud_entry.py"]
