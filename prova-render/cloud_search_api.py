@@ -91,7 +91,10 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def do_GET(self):
-        if self.path in ('/', '/health'):
+        if self.path == '/health':
+            import cadastro_materials
+            return self.reply(200, {'status':'ok','cadastro_catmat':cadastro_materials.BASE.is_file()})
+        if self.path == '/':
             return self.reply(200, {'status':'ok'})
         identity = self.identity()
         if not identity:
