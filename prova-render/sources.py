@@ -60,6 +60,9 @@ def ocr_page(data, index):
             try:im=page.render(scale=3).to_pil()
             finally:page.close()
         finally:doc.close()
+    return ocr_image(im)
+
+def ocr_image(im):
     texts=[]
     CACHE.mkdir(exist_ok=True)
     prefix=uuid.uuid4().hex
@@ -81,6 +84,23 @@ def ocr_page(data, index):
         for path in paths:
             if path.exists():path.unlink()
     return '\n'.join(texts)
+
+def journal_page_text(url, page, fetch):
+    with journal_preview_pdf(url, fetch) as doc:
+        if page > len(doc): return None
+        pdfpage = doc[page-1]
+        try:
+            textpage = pdfpage.get_textpage()
+            try: return textpage.get_text_range()
+            finally: textpage.close()
+        finally: pdfpage.close()
+
+def journal_page_ocr(url, page, fetch):
+    with journal_preview_pdf(url, fetch) as doc:
+        pdfpage = doc[page-1]
+        try: image = pdfpage.render(scale=3).to_pil()
+        finally: pdfpage.close()
+    return ocr_image(image)
 
 def pdf_text(data):
     import pypdfium2 as pdfium
@@ -234,7 +254,7 @@ def search_journal(params, candidates, fetch, classify, progress):
 def search_journal_extract(params, fetch, classify, progress):
     when=(date.fromisoformat(params['extract_date'])+timedelta(days=1)).isoformat()
     rows={};notes=[]
-    progress(f'Jornal: procurando edição de {when}, páginas 18, 19 e 20…')
+    progress(f'Jornal: procurando edição de {when}, priorizando a página 19…')
     editions=journal_editions(when,fetch)
     if not editions:
         return [],[f'Jornal: nenhuma edição disponível para {when}. Use a visualização manual para escolher outra data.']
@@ -243,28 +263,35 @@ def search_journal_extract(params, fetch, classify, progress):
         if any(r['url'] in general_urls for r in rows.values()) and not edition.get('general',False):
             break  # A edição geral já trouxe correspondências; especiais ficam disponíveis manualmente.
         try:
-            data=cached_pdf(edition['url'],fetch);texts=pdf_text(data)
-            for page in (18,19,20):
-                if page>len(texts):
-                    notes.append(f'Jornal {when}: a edição tem {len(texts)} páginas; página {page} indisponível.')
+            for page in (19,18,20):
+                progress(f'Jornal {when}: verificando página {page}…')
+                text=journal_page_text(edition['url'],page,fetch)
+                if text is None:
+                    notes.append(f'Jornal {when}: página {page} indisponível nesta edição.')
                     continue
-                text=texts[page-1];used_ocr=False
+                used_ocr=False
+                row=result('jornal','O Estado · '+edition['title'],edition['date'],page,text,edition['url'],params,classify)
+                matched=('Código e-Sfinge' in row['reasons'] if params['esfinge'] else row['reasons']!=['Resultado aproximado do Diário'])
                 try:
                     cache=CACHE/(hashlib.sha256(edition['url'].encode()).hexdigest()+f'_ocr3_{page}.txt')
-                    progress(f'Jornal {when}: OCR da página {page}…')
-                    if cache.exists():extra=cache.read_text(encoding='utf8')
-                    else:
-                        extra=ocr_page(data,page-1)
-                        CACHE.mkdir(exist_ok=True);cache.write_text(extra,encoding='utf8')
-                    text+='\n'+extra;used_ocr=True
+                    if not matched:
+                        progress(f'Jornal {when}: OCR da página {page}…')
+                        if cache.exists():extra=cache.read_text(encoding='utf8')
+                        else:
+                            extra=journal_page_ocr(edition['url'],page,fetch)
+                            CACHE.mkdir(exist_ok=True);cache.write_text(extra,encoding='utf8')
+                        text+='\n'+extra;used_ocr=True
                 except Exception as exc:
                     notes.append(f'Jornal {when}, página {page}: OCR indisponível: {exc}')
                 row=result('jornal','O Estado · '+edition['title'],edition['date'],page,text,edition['url'],params,classify)
                 row['ocr']=used_ocr
                 if ('Código e-Sfinge' in row['reasons'] if params['esfinge'] else row['reasons']!=['Resultado aproximado do Diário']):
                     rows[row['id']]=row
+                    if page==19 and ('Código e-Sfinge' in row['reasons'] or 'Número do processo' in row['reasons']):
+                        notes.append('Jornal: correspondência encontrada na página 19; as páginas 18 e 20 não foram pesquisadas automaticamente. Confira a edição para outras publicações.')
+                        break
         except Exception as exc:notes.append(f'Jornal {when}: leitura incompleta: {exc}')
-    notes.append(f'Jornal: consulta direcionada a {when}, páginas 18, 19 e 20 pela posição no PDF. Para outras datas ou páginas, use Visualizar jornal.')
+    notes.append(f'Jornal: consulta direcionada a {when}, página 19 primeiro; se necessário, páginas 18 e 20 pela posição no PDF. Para outras datas ou páginas, use Visualizar jornal. O OCR pode não reconhecer todos os caracteres.')
     return list(rows.values()),list(dict.fromkeys(notes))
 
 
