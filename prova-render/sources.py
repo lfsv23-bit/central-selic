@@ -312,8 +312,8 @@ def journal_editions(when, fetch):
     return sorted(found.values(),key=lambda e:(not e['general'],e['title']))
 
 def manual_journal_rows(edition,pages,params,fetch,classify):
-    from pypdf import PdfReader
-    data=cached_pdf(edition['url'],fetch);count=len(PdfReader(io.BytesIO(data)).pages)
+    with journal_preview_pdf(edition['url'],fetch) as doc:
+        count=len(doc)
     if not isinstance(pages,list) or not pages or len(pages)>200 or any(type(p) is not int or p<1 or p>count for p in pages):raise ValueError(f'Informe páginas de 1 a {count}, conforme a posição no PDF.')
     rows=[]
     for page in sorted(set(pages)):
