@@ -234,12 +234,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not source:
                     catalog_id=data.get('catalog_id','')
                     if catalog_id:cloud_catalog.get(store,catalog_id)
-                    search_id=jobs.create(identity.user_id,params=params,catalog_id=catalog_id,message='Páginas adicionadas.')
                     source={'results':[],'sources':[]}
                 existing={r['id']:r for r in source.get('results',[])};existing.update({r['id']:r for r in rows})
                 states=[s for s in source.get('sources',[]) if s.get('source')!='jornal']
                 states.append(dict(source='jornal',name=sources.NAMES['jornal'],count=sum(r['source']=='jornal' for r in existing.values()),status='inclui seleção manual'))
-                jobs.update(identity.user_id,search_id,status='done',params=params,results=list(existing.values()),sources=states)
+                if search_id:
+                    jobs.update(identity.user_id,search_id,status='done',params=params,results=list(existing.values()),sources=states)
+                else:
+                    search_id=jobs.create_completed(identity.user_id,params=params,catalog_id=catalog_id,message='Páginas adicionadas.',results=list(existing.values()),sources=states)
                 return self.reply(200,{'rows':rows,'search_id':search_id})
             elif self.path=='/api/catalog/export':
                 record=cloud_catalog.get(store,data['id']);mode=data.get('mode','pages')

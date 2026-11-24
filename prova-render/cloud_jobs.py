@@ -43,6 +43,19 @@ class JobStore:
                                   '_updated': self._clock()}
             return job_id
 
+    def create_completed(self, owner, **values):
+        """Guarda resultado já pronto, sem ocupar vaga de processamento."""
+        if not owner:
+            raise ValueError('O usuário é obrigatório.')
+        if any(key.startswith('_') or key == 'status' for key in values):
+            raise ValueError('Campo reservado.')
+        with self._lock:
+            self._prune()
+            job_id = uuid.uuid4().hex
+            self._jobs[job_id] = {**values, 'status': 'done', '_owner': owner,
+                                  '_updated': self._clock()}
+            return job_id
+
     def get(self, owner, job_id):
         with self._lock:
             self._prune()
