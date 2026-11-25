@@ -13,10 +13,11 @@
 <label class="pick">Selecionar PDFs<input id="files" type="file" accept=".pdf,application/pdf" multiple></label>
 <button id="add" type="button">Adicionar linha</button>
 <button id="clear" type="button" disabled>Limpar tabela</button>
+<button id="register-supplier" type="button" disabled>Registrar Fornecedor</button>
 <span id="feedback" role="status"></span>
 </div>
 <p id="status" role="status">Selecione os documentos de um fornecedor para começar.</p>
-<p class="hint">A leitura ocorre no navegador. A leitura de PDFs com texto funciona offline. O OCR de páginas digitalizadas precisa de internet. Confira os campos destacados e edite conforme necessário.</p>
+<p class="hint">Para registrar, importe um único comprovante de CNPJ identificado e confira os dados antes de salvar. A leitura ocorre no navegador. A leitura de PDFs com texto funciona offline. O OCR de páginas digitalizadas precisa de internet. Confira os campos destacados e edite conforme necessário.</p>
 </section>
 <section class="panel" id="tablePanel" hidden>
 <table aria-label="Documentos do fornecedor"><thead><tr><th>Título do documento</th><th>Numeração / identificação</th><th>Emissão</th><th>Validade</th><th>Ações</th></tr></thead><tbody id="rows"></tbody></table>
@@ -167,6 +168,16 @@ function parse(name, pages) {
   if (/CADASTRO NACIONAL DA PESSOA JURIDICA/.test(t) || /\bCNPJ\b/.test(title)) return one('CADASTRO NACIONAL DA PESSOA JURÍDICA',idCnpj,issued,'');
   return one(name.replace(/\.pdf$/i,''),'',issued,expiry,true);
 }
+function extractSupplier(pages) {
+  const text=pages.join('\n'), normalized=plain(text);
+  if (!/CADASTRO NACIONAL DA PESSOA JURIDICA/.test(normalized)) return null;
+  const lines=text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  const labels=/^(?:NOME EMPRESARIAL|TITULO DO ESTABELECIMENTO|ENDERECO ELETRONICO|TELEFONE|DATA |PORTE|CODIGO |SITUACAO |ENTE |NUMERO |LOGRADOURO|COMPLEMENTO|CEP|BAIRRO|MUNICIPIO|UF$)/;
+  function field(re) {const i=lines.findIndex(x=>re.test(plain(x)));if(i<0)return '';const line=lines[i];const same=line.replace(/^[^:]+:\s*/, '');if(same!==line&&same.trim())return same.trim();const next=lines[i+1]||'';return labels.test(plain(next))?'':next;}
+  const cnpj=(text.match(/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/)||[])[0]||'';
+  const clean=v=>/^[*\s-]+$/.test(v)?'':v;
+  return {cnpj,razao_social:clean(field(/^NOME EMPRESARIAL/)),nome_fantasia:clean(field(/^TITULO DO ESTABELECIMENTO/)),email:clean(field(/^ENDERECO ELETRONICO/)),telefone:clean(field(/^TELEFONE/))};
+}
 const rows = document.querySelector('#rows');
 const files = document.querySelector('#files');
 const status = document.querySelector('#status');
@@ -174,6 +185,10 @@ const feedback = document.querySelector('#feedback');
 const tablePanel = document.querySelector('#tablePanel');
 const add = document.querySelector('#add');
 const clear = document.querySelector('#clear');
+const registerSupplier = document.querySelector('#register-supplier');
+function supplierRows(){return [...rows.rows].filter(tr=>tr._supplier && /^CADASTRO NACIONAL DA PESSOA JUR[IÍ]DICA$/i.test(tr.cells[0].querySelector('input').value.trim()) && tr.cells[1].querySelector('input').value.replace(/\D/g,'').length===14);}
+function updateRegister(){registerSupplier.disabled=files.disabled || supplierRows().length!==1;}
+registerSupplier.addEventListener('click',()=>{const list=supplierRows();if(list.length!==1)return;const tr=list[0],supplier={...tr._supplier,cnpj:tr.cells[1].querySelector('input').value};if(window.parent===window){status.textContent='Abra este leitor pela aba Cadastro de Fornecedores para registrar.';return}window.parent.postMessage({type:'central-fornecedor-prefill-v1',supplier},location.origin);});
 const labels = ['Título do documento','Numeração / identificação','Emissão','Validade'];
 const sourceUrls = new Set();
 let feedbackTimer;
@@ -195,6 +210,7 @@ function append(row) {
   tablePanel.hidden = false;
   clear.disabled = files.disabled;
   const tr = rows.insertRow();
+  tr._supplier = row.supplier || null;
   row.values.forEach((value,index) => {
     const td = tr.insertCell();
     const group = document.createElement('div');
@@ -209,6 +225,7 @@ function append(row) {
     input.addEventListener('input',()=>{
       input.classList.remove('review');
       input.title = input.value;
+      updateRegister();
     });
     const button = document.createElement('button');
     button.textContent = 'Copiar';
@@ -250,8 +267,10 @@ function append(row) {
     tr.remove();
     tablePanel.hidden = !rows.rows.length;
     clear.disabled = files.disabled || tablePanel.hidden;
+    updateRegister();
   });
   tr.insertCell().append(remove);
+  updateRegister();
 }
 function pageText(items) {
   const lines = [];
@@ -326,6 +345,7 @@ async function startOcr() {
 add.addEventListener('click',()=>append({source:'',values:['','','','']}));
 clear.addEventListener('click',()=>{
   rows.replaceChildren();
+  updateRegister();
   for (const url of sourceUrls) URL.revokeObjectURL(url);
   sourceUrls.clear();
   tablePanel.hidden = clear.disabled = true;
@@ -335,6 +355,7 @@ files.addEventListener('change',async ()=>{
   const selected = [...files.files];
   if (!selected.length) return;
   files.disabled = true;
+  updateRegister();
   clear.disabled = true;
   let worker;
   let ocr;
@@ -368,6 +389,7 @@ files.addEventListener('change',async ()=>{
         });
         if (incomplete) errors++;
         for (const row of parse(file.name,pages)) {
+          if (row.values[0] === 'CADASTRO NACIONAL DA PESSOA JURÍDICA') row.supplier = extractSupplier(pages);
           row.url = url;
           if (incomplete) {
             row.review = true;
@@ -397,6 +419,7 @@ files.addEventListener('change',async ()=>{
   } finally {
     files.value = '';
     files.disabled = false;
+    updateRegister();
     clear.disabled = !rows.rows.length;
     if (worker) await worker.terminate();
   }
