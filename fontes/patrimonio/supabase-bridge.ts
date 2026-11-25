@@ -8,7 +8,11 @@ const clean=(v:unknown,max=2000)=>typeof v==='string'?v.trim().slice(0,max):'';
 async function execute(input:any,row:any){
   const s:State=structuredClone(row.payload);const areaName=(id:string)=>getAreas(s).find(a=>a.id===id)?.name||id;let note='';const now=new Date().toISOString();
   const validArea=(v:string)=>getAreas(s).some(a=>a.id===v);const fail=(m:string)=>{throw new Error(m)};
-  if(input.action==='import'){
+  if(input.action==='clear_all'){
+   if(input.confirmation!=='EXCLUIR TUDO')fail('Confirmação inválida.');
+   s.assets=[];s.people=[];s.history=[];s.sectors=[];s.areaNames={};s.layout={pieces:[],labels:[],regions:[],assetPositions:[]};s.round='Conferência inicial';
+   return s;
+  }else if(input.action==='import'){
    if(!Array.isArray(input.rows)||input.rows.length>5000)fail('Arquivo de importação inválido.');
    const rows:ImportRow[]=input.rows.map((r:any)=>({code:clean(r.code,50),description:clean(r.description,500),legacy:clean(r.legacy,100),notes:clean(r.notes,2000)}));
    const plan=planImport(s,rows);if(plan.issues.length)fail('Existem inconsistências na importação. Recarregue e revise antes de salvar.');
