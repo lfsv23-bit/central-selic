@@ -1,0 +1,150 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script><script src="bridge.js"></script><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atualizações de processos</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f766e'/%3E%3Cpath d='M8 9h16v15H8z' fill='white'/%3E%3Cpath d='m11 16 3 3 7-7' fill='none' stroke='%230f766e' stroke-width='2'/%3E%3C/svg%3E">
+<style>body{font:16px system-ui;color:#18332f;background:#f2f6f4;margin:0}main{max-width:1050px;margin:50px auto;padding:0 24px}h1{font-size:34px;letter-spacing:-1px;margin-bottom:8px}p{color:#526a64;line-height:1.6}.box,article{background:white;border:1px solid #dce5e0;border-radius:16px;padding:24px;margin:20px 0}form{display:flex;gap:12px;align-items:end;flex-wrap:wrap}label{display:grid;gap:8px;font-size:14px}input{padding:13px;border:1px solid #b4c9bf;border-radius:8px;font:inherit}button{background:#0f766e;color:white;border:0;border-radius:8px;padding:15px 22px;font-weight:600;cursor:pointer}button:disabled{opacity:.5;cursor:wait}#status{margin-top:16px}#stats{display:flex;gap:32px;margin:22px 0;color:#45635a}strong{color:#173b31}.badge{font-size:13px;background:#e3f3ec;border-radius:20px;padding:5px 10px}h3{font-size:18px;line-height:1.5}table{width:100%;border-collapse:collapse;text-align:left;font-size:14px}td,th{padding:12px 8px;border-top:1px solid #e5ece8;vertical-align:top;overflow-wrap:anywhere}td{width:38%}th{width:24%}details{background:white;padding:16px;border-radius:10px;margin:12px 0}summary{cursor:pointer}small{color:#60796f}#error{color:#ac3030} @media(max-width:650px){main{margin:24px auto;padding:0 14px}h1{font-size:28px}.box,article{padding:16px}#stats{gap:16px;flex-wrap:wrap}input{width:90%}td,th{padding:9px 4px}}</style>
+<style>
+:root{color-scheme:light;--ink:#142a3a;--muted:#4c6476;--line:#dbe5ee;--accent:#08786f}
+body{background:#f2f6fa;color:var(--ink)}main{max-width:1080px;margin:32px auto}
+.hero{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:30px;border-radius:22px;background:linear-gradient(125deg,#112e44,#184e62);color:white;box-shadow:0 12px 28px #173b5224}
+.hero h1{font-size:clamp(25px,4vw,38px);margin:8px 0}.hero small{color:#9ee5db;font-weight:700;letter-spacing:.1em;font-size:11px}.hero p{color:#d6e9f2;margin:0}.hero form{margin:0}
+button.history-button{background:#b9f3e5;color:#123c39;white-space:nowrap}.history-button span{margin-left:8px}
+.box,article,details{border:1px solid var(--line);box-shadow:0 4px 14px #173b520a}.box{padding:24px}p,small{color:var(--muted)}
+input,select{min-height:44px;padding:9px 12px;border:1px solid #aebfcd;border-radius:9px;background:#fff;color:var(--ink);font:inherit;box-sizing:border-box}label{font-weight:600;color:#314e60}
+button{background:var(--accent);min-height:44px;padding:11px 16px}button:hover:not(:disabled){filter:brightness(.94)}:is(button,input,select,summary):focus-visible{outline:3px solid #1c87c4;outline-offset:3px}
+#monitor{color:#135e56;background:#e3f4f0}#monitorStatus{padding:10px 12px;border-radius:8px;background:#eff8f7;color:#185950;font-size:14px;font-weight:600}
+#stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}#stats span{padding:16px;border:1px solid var(--line);border-radius:12px;background:white}#stats strong{display:block;font-size:26px}
+.badge{background:#dff4ef;color:#146052;font-weight:700}article h3{margin:10px 0}table thead{background:#eef4f8}table tbody tr:nth-child(even){background:#f7fafc}
+#historyMatches>.box>h2{margin:0;font-size:19px}#historyMatches article{margin:12px 0 0}#historyCount{font-weight:700}
+@media(max-width:700px){main{margin:16px auto}.hero{align-items:flex-start;flex-direction:column;padding:22px}.box{padding:16px}#stats span{padding:10px;font-size:13px}}
+</style>
+<style>.reportActions{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.reportScroll{overflow:auto}#reportTable{min-width:1050px;table-layout:fixed}#reportTable :is(th,td){width:auto;white-space:pre-wrap;overflow-wrap:break-word}#reportTable :is(th,td):nth-child(1),#reportTable :is(th,td):nth-child(2){width:100px}#reportTable :is(th,td):nth-child(3){width:65px;white-space:nowrap}#reportTable :is(th,td):nth-child(4){width:88px;white-space:nowrap}#reportTable :is(th,td):nth-child(5){width:18%}#reportTable :is(th,td):nth-child(6){width:90px}#reportTable td:nth-child(-n+2){font-variant-numeric:tabular-nums}#reportChart progress{display:block;width:100%;accent-color:#08786f;margin-bottom:10px}@media print{main{margin:0;padding:0}#historyPage>:not(#report),.reportActions,#reportError{display:none!important}#report{border:0;box-shadow:none;padding:0}.reportScroll{overflow:visible}@page{size:landscape;margin:12mm}#reportTable{min-width:0;font-size:9px}#reportTable :is(th,td){padding:6px 4px}#reportTable :is(th,td):nth-child(1),#reportTable :is(th,td):nth-child(2){width:65px}#reportTable :is(th,td):nth-child(3){width:45px}#reportTable :is(th,td):nth-child(4){width:62px}#reportTable :is(th,td):nth-child(6){width:62px}#reportTable thead{display:table-header-group}#reportTable tr{break-inside:avoid}}</style><main id="dashboard"><header class="hero"><div><small> CENTRAL SELIC · CONTROLE DE PROCESSOS</small><h1>Atualizações de Processos</h1><p>Acompanhe o que mudou desde a última consulta.</p></div><form action="/" target="_blank" onsubmit="this.action=location.href.split('#')[0]+'#historico';window.open(this.action,'_blank','noopener');return false"><button class="history-button" type="submit">Abrir histórico em outra aba <span aria-hidden="true">↗</span></button></form></header>
+<section class="box"><form id="form"><label>Senha do sistema<input id="password" type="password" autocomplete="off" required></label><button id="check">Verificar atualizações</button><button id="monitor" type="button">Iniciar monitoramento</button></form><p>Consulta automática a cada minuto enquanto este painel estiver aberto. O navegador pode atrasar consultas em segundo plano. A senha fica apenas na memória da página durante o monitoramento.</p><p><button type="button" id="generateManagement">Gerar HTML · Gerenciamento de Processos ↗</button></p><div id="monitorStatus" role="status">Monitoramento desligado.</div><div id="status" role="status">A primeira consulta cria a referência para as próximas comparações.</div><div id="error" role="alert"></div></section>
+<div id="stats"></div><section id="results"></section><h2>Última consulta</h2><section id="history"></section><p><small>Histórico salvo na sua conta da Central SELIC. A senha não é salva em arquivo. São mostradas diferenças entre consultas; alterações intermediárias podem não aparecer. “Responsável” é o responsável pelo processo, não a pessoa que fez a alteração.</small></p></main>
+<main id="historyPage" hidden>
+<header class="hero"><div><small>CENTRAL SELIC · CONTROLE DE PROCESSOS</small><h1>Histórico de alterações</h1></div></header>
+<p>As datas indicam quando a mudança foi detectada. Quando há uma consulta anterior, o intervalo entre as duas é a referência para a alteração.</p>
+<section class="box"><form id="historyFilters">
+<label>Número do processo<input id="processQuery" type="search" placeholder="Ex.: 1234/2026"></label>
+<label>De<input id="historyFrom" type="date"></label><label>Até<input id="historyTo" type="date"></label>
+<label>Tipo<select id="historyType"><option value="">Todos</option><option>Novo</option><option>Alterado</option><option>Removido</option></select></label>
+<label>Hora inicial<input id="reportStart" type="time"></label><label>Hora final<input id="reportEnd" type="time"></label><button type="button" id="refreshHistory">Atualizar histórico</button>
+</form></section>
+<p id="historyCount" role="status"></p><section class="box" id="report"><h2>Relatório de mudanças</h2><p id="reportScope"></p><div id="reportChart"></div><div class="reportActions"><button id="xls">Exportar XLS</button> <button id="pdf">Salvar PDF</button> <button id="printReport">Imprimir</button></div><p id="reportError" role="status"></p><div class="reportScroll"><table id="reportTable"></table></div></section><details class="consultations"><summary>Consultas registradas</summary><section id="historyMatches"></section></details>
+</main>
+<script>
+const $=id=>document.getElementById(id); const esc=v=>String(v??'Não informado').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); const fmt=v=>typeof v==='boolean'?(v?'No setor':'Fora do setor'):esc(v); const date=v=>new Date(v).toLocaleString('pt-BR');
+function fieldValue(field,value){
+ const match=field==='Recebimento'&&typeof value==='string'&&/^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+ return match?[match[3],match[2],match[1]].join('/'):value;
+}
+function cards(entry){return entry.mudancas.map(c=>`<article><span class="badge">${esc(c.tipo)}</span><h3>${esc(c.processo.numero)} · ${esc(c.processo.objeto)}</h3><p>${esc(c.processo.secretaria)} · Responsável: ${esc(c.processo.responsavel)}</p>${c.campos.length?'<table><thead><tr><th>Campo</th><th>Antes</th><th>Depois</th></tr></thead><tbody>'+c.campos.map(f=>`<tr><th>${esc(f.campo)}</th><td>${fmt(fieldValue(f.campo,f.antes))}</td><td>${fmt(fieldValue(f.campo,f.depois))}</td></tr>`).join('')+'</tbody></table>':`<p>Andamento: ${esc(c.processo.andamento)} · ${fmt(c.processo.ativo)}</p>`}</article>`).join('')}
+function render(data){const h=data.history; if(!h.length){$('history').textContent='Nenhuma consulta realizada.';return}const e=h[0];$('stats').innerHTML=`<span><strong>${e.total}</strong> processos</span><span><strong>${e.noSetor}</strong> no setor</span><span><strong>${e.mudancas.length}</strong> com mudanças</span>`;$('status').textContent=e.primeira?`Referência criada em ${date(e.quando)}. Clique novamente para detectar mudanças.`:`Consulta em ${date(e.quando)} · Comparação com ${date(e.desde)}.`;$('results').innerHTML=e.primeira?'<p>Referência salva. As próximas consultas mostrarão as diferenças.</p>':e.mudancas.length?cards(e):'<p>Nenhuma mudança detectada desde a consulta anterior.</p>';$('history').innerHTML=h.slice(0,1).map(e=>`<details><summary>${date(e.quando)} · ${e.primeira?'Referência inicial':e.mudancas.length+' processos com mudanças'}</summary>${e.primeira?'<p>Referência inicial salva.</p>':cards(e)||'<p>Sem mudanças.</p>'}</details>`).join('')}
+let automaticPassword='', timer=null, busy=false;
+function controls(){const active=!!automaticPassword;$('check').disabled=busy||active;$('password').disabled=active;$('monitor').disabled=busy&&!active;$('monitor').textContent=active?'Parar monitoramento':'Iniciar monitoramento';}
+function stop(message){clearTimeout(timer);timer=null;automaticPassword='';$('monitorStatus').textContent=message;controls();}
+async function check(password){
+ if(busy)return false;
+ busy=true;controls();$('error').textContent='';$('status').textContent='Consultando os processos…';
+ try{const r=await fetch('/verificar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});const data=await r.json();if(!r.ok)throw Error(data.error);render(data);return true;}
+ catch(err){$('error').textContent=err.message;$('status').textContent='Consulta não concluída.';return false;}
+ finally{busy=false;controls();}
+}
+async function tick(){
+ if(!automaticPassword)return;
+ const started=Date.now();
+ $('monitorStatus').textContent='Monitoramento ativo · consultando agora.';
+ const ok=await check(automaticPassword);
+ if(!automaticPassword)return;
+ if(!ok){stop('Monitoramento pausado após falha. Confira a mensagem e reinicie.');return;}
+ const delay=Math.max(1000,60000-(Date.now()-started));
+ $('monitorStatus').textContent=`Monitoramento ativo · próxima consulta prevista às ${new Date(Date.now()+delay).toLocaleTimeString('pt-BR')}.`;
+ timer=setTimeout(tick,delay);
+}
+$('form').onsubmit=e=>{e.preventDefault();if(!automaticPassword)void check($('password').value);};
+$('monitor').onclick=()=>{
+ if(automaticPassword){stop('Monitoramento desligado. Uma consulta já iniciada pode terminar.');return;}
+ if(busy||!$('password').reportValidity())return;
+ automaticPassword=$('password').value;$('password').value='';void tick();
+};
+$('generateManagement').onclick=async()=>{const tab=window.open('','_blank');if(!tab){$('error').textContent='Permita a abertura de novas abas para gerar o painel.';return}try{const {state}=await window.CentralAtualizacoes.read();const response=await fetch('gerenciamento-template.html');if(!response.ok)throw Error('Modelo de gerenciamento indisponível.');const template=await response.text();const payload=JSON.stringify(state).replace(/</g,'\\u003c');const blob=new Blob([template.replace('__PROCESS_DATA__',payload)],{type:'text/html;charset=utf-8'});tab.location.href=URL.createObjectURL(blob)}catch(e){tab.close();$('error').textContent=e.message}};
+window.addEventListener('pagehide',()=>stop('Monitoramento desligado.'));
+const historyOnly=location.hash==='#historico';
+let savedHistory=[];
+const historyDay=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Cuiaba',year:'numeric',month:'2-digit',day:'2-digit'});
+const historyTime=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Cuiaba',dateStyle:'short',timeStyle:'medium'});
+const processKey=v=>String(v??'').trim().replace(/[.\s]/g,'').replace(/^0+(?=\d)/,'');
+const clockFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Cuiaba',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+const reportTypes={Novo:'Inserido',Alterado:'Alterado',Removido:'Excluído'};
+const headers=['Detectado em','Consulta anterior','Tipo','Processo','Objeto','Campos','Antes','Depois'];
+let reportRows=[], exporting=false;
+function drawReport(events,scope){
+ $('reportScope').textContent=scope+' · '+events.length+' ocorrência(s)';
+ $('reportChart').innerHTML=Object.entries(reportTypes).map(([k,label])=>{
+  const n=events.filter(([,c])=>c.tipo===k).length;
+  return '<div>'+label+': <strong>'+n+'</strong></div><progress aria-label="'+label+'" value="'+n+'" max="'+(events.length||1)+'"></progress>';
+ }).join('');
+ const value=v=>typeof v==='boolean'?(v?'No setor':'Fora do setor'):String(v??'Não informado');
+ reportRows=events.map(([e,c])=>{
+  const fields=c.campos||[], summary=[c.processo.objeto,c.processo.secretaria,c.processo.andamento,c.processo.responsavel].filter(Boolean).join(' · ');
+  return [historyTime.format(new Date(e.quando)).replace(', ','\n'),e.desde?historyTime.format(new Date(e.desde)).replace(', ','\n'):'—',reportTypes[c.tipo]||c.tipo,c.processo.numero??'',c.processo.objeto??'',fields.map(f=>f.campo).join('\n'),fields.length?fields.map(f=>f.campo+': '+value(fieldValue(f.campo,f.antes))).join('\n'):c.tipo==='Removido'?summary:'—',fields.length?fields.map(f=>f.campo+': '+value(fieldValue(f.campo,f.depois))).join('\n'):c.tipo==='Novo'?summary:'—'];
+ });
+ $('reportTable').innerHTML='<thead><tr>'+headers.map(v=>'<th scope="col">'+esc(v)+'</th>').join('')+'</tr></thead><tbody>'+(reportRows.map(r=>'<tr>'+r.map(v=>'<td>'+esc(v)+'</td>').join('')+'</tr>').join('')||'<tr><td colspan="8">Nenhuma mudança no período.</td></tr>')+'</tbody>';
+ for(const id of ['xls','pdf','printReport'])$(id).disabled=!reportRows.length||(id==='xls'&&exporting);
+}
+async function exportXls(){
+ if(exporting||!reportRows.length)return;
+ const rows=reportRows,scope=$('reportScope').textContent;
+ exporting=true;$('xls').disabled=true;$('reportError').textContent='';
+ try{
+  if(rows.length>65533)throw Error('O XLS permite até 65.536 linhas por aba. Reduza o período.');
+  if(!window.XLSX)await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';s.onload=resolve;s.onerror=()=>{s.remove();reject(Error('Não foi possível carregar o exportador XLS. Verifique a conexão.'));};document.head.append(s);});
+  const book=XLSX.utils.book_new(),sheet=XLSX.utils.aoa_to_sheet([['Relatório de mudanças · Central SELIC'],[scope],headers,...rows]);
+  sheet['!cols']=[22,22,14,16,45,25,55,55].map(wch=>({wch}));
+  XLSX.utils.book_append_sheet(book,sheet,'Mudanças');XLSX.writeFile(book,'relatorio-mudancas.xls',{bookType:'biff8'});
+ }catch(e){$('reportError').textContent=e.message;}
+ finally{exporting=false;$('xls').disabled=!reportRows.length;}
+}
+function filterHistory(){
+ const query=processKey($('processQuery').value),from=$('historyFrom').value,to=$('historyTo').value,type=$('historyType').value;
+ const start=$('reportStart').value,end=$('reportEnd').value,events=[];
+ const lower=from?from+'T'+(start||'00:00'):'',upper=to?to+'T'+(end||'23:59'):'';
+ const scope='Período: '+(from||'início')+(start?' '+start:'')+' a '+(to||'fim')+(end?' '+end:'')+(query?' · Processo '+query:'')+(type?' · '+type:'');
+ if((lower&&upper&&lower>upper)||(!from&&!to&&start&&end&&start>end)){drawReport([], 'Período inválido');$('historyCount').textContent='A data inicial deve ser anterior ou igual à final.';$('historyMatches').innerHTML='';return;}
+ let count=0;
+ $('historyMatches').innerHTML=savedHistory.map(entry=>{
+  const day=historyDay.format(new Date(entry.quando));
+  const clock=clockFormat.format(new Date(entry.quando)),stamp=day+'T'+clock;
+  if((lower&&stamp<lower)||(upper&&stamp>upper)||(!from&&start&&clock<start)||(!to&&end&&clock>end))return '';
+  const mudancas=entry.mudancas.filter(c=>{
+   const number=processKey(c.processo.numero);
+   return (!type||c.tipo===type)&&(!query||(query.includes('/')?number===query:number.split('/')[0].includes(query)));
+  });
+  if(!mudancas.length&&(type||query))return '';
+  count+=mudancas.length;for(const c of mudancas)events.push([entry,c]);
+  const detected=historyTime.format(new Date(entry.quando));
+  const previous=entry.desde?historyTime.format(new Date(entry.desde)):null;
+  return `<section class="box"><h2>Detectado em ${esc(detected)}</h2><p>${previous?'Consulta anterior: '+esc(previous):'Consulta anterior não registrada.'}</p>${mudancas.length?cards({...entry,mudancas}):entry.primeira?"<p>Referência inicial salva.</p>":"<p>Nenhuma mudança detectada.</p>"}</section>`;
+ }).join('');
+ drawReport(events,scope); $('historyCount').textContent=count?count+' ocorrência(s) no histórico.':(query||type?'Nenhuma alteração encontrada para esses filtros.':'Nenhuma alteração nas consultas exibidas.');
+}
+async function loadHistory(){
+ if(historyOnly){$('refreshHistory').disabled=true;$('historyCount').textContent='Carregando histórico…';}
+ try{
+  const r=await fetch('/historico');const data=await r.json();
+  if(!r.ok||data.error)throw Error(data.error||'Não foi possível carregar o histórico.');
+  if(historyOnly){savedHistory=data.history;filterHistory();}
+  else if(!busy&&!automaticPassword)render(data);
+ }catch(e){$(historyOnly?'historyCount':'error').textContent=e.message;}
+ finally{if(historyOnly)$('refreshHistory').disabled=false;}
+}
+if(historyOnly){
+ $('dashboard').hidden=true;$('historyPage').hidden=false;document.title='Histórico de alterações · Central SELIC';
+ $('historyFilters').onsubmit=e=>e.preventDefault();
+ $('historyFilters').addEventListener('input',filterHistory);
+ $('refreshHistory').onclick=loadHistory;
+ $('xls').onclick=exportXls;
+ $('pdf').onclick=()=>window.print();
+ $('printReport').onclick=()=>window.print();
+ drawReport([],'Carregando histórico…');
+}
+loadHistory();
+</script></html>

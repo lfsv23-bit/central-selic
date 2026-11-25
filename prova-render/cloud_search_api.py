@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import app
+import atualizacoes_stic
 import catalog
 import cloud_catalog
 import cloud_security
@@ -92,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path in ('/', '/health'):
-            return self.reply(200, {'status':'ok'})
+            return self.reply(200, {'status':'ok','atualizacoes':True})
         identity = self.identity()
         if not identity:
             return
@@ -175,16 +176,20 @@ class Handler(BaseHTTPRequestHandler):
         identity = self.identity()
         if not identity:
             return
-        if self.path not in ('/api/search','/api/catalog/import','/api/catalog/save','/api/catalog/edit','/api/catalog/delete','/api/catalog/load','/api/catalog/export','/api/export','/api/journal/editions','/api/journal/preview','/api/journal/add','/api/dou'):
+        if self.path not in ('/api/atualizacoes/consultar','/api/search','/api/catalog/import','/api/catalog/save','/api/catalog/edit','/api/catalog/delete','/api/catalog/load','/api/catalog/export','/api/export','/api/journal/editions','/api/journal/preview','/api/journal/add','/api/dou'):
             return self.reply(404, {'error': 'Não encontrado.'})
         if self.headers.get('Content-Type', '').split(';', 1)[0].strip().lower() != 'application/json':
             return self.reply(415, {'error': 'Envie JSON.'})
         try:
             size = int(self.headers.get('Content-Length', '0'))
-            if size <= 0 or size > (15*1024*1024 if self.path=='/api/catalog/import' else 1000000):
+            if size <= 0 or size > (4096 if self.path=='/api/atualizacoes/consultar' else 15*1024*1024 if self.path=='/api/catalog/import' else 1000000):
                 raise ValueError('Pedido inválido.')
             data=json.loads(self.rfile.read(size));store=CloudStore(self.headers['Authorization'][7:].strip())
-            if self.path=='/api/catalog/import':
+            if self.path=='/api/atualizacoes/consultar':
+                try: rows=atualizacoes_stic.fetch(data.get('password'))
+                except ValueError as exc: return self.reply(400,{'error':str(exc)})
+                return self.reply(200,{'processes':rows})
+            elif self.path=='/api/catalog/import':
                 job_id=jobs.create(identity.user_id,message='Lendo documento…')
                 threading.Thread(target=_run_import,args=(job_id,identity.user_id,store._token,data),daemon=True).start()
             elif self.path=='/api/catalog/save':
@@ -275,3 +280,4 @@ class Handler(BaseHTTPRequestHandler):
 
 def create_server(host='127.0.0.1', port=0):
     return ThreadingHTTPServer((host, port), Handler)
+

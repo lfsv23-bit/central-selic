@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gerenciamento de Processos · SELIC</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f2f6fa;color:#142a3a;font:15px system-ui,sans-serif}main{max-width:1400px;margin:auto;padding:24px}header{background:#15394f;color:white;padding:25px;border-radius:16px}h1{margin:6px 0}p{line-height:1.5}button,input{font:inherit;border:1px solid #b9cbd8;border-radius:8px;padding:9px 12px;background:white;color:#17394d}button{cursor:pointer;font-weight:650}button[aria-pressed=true],#save{background:#08786f;color:white;border-color:#08786f}.controls{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.controls[hidden]{display:none}.controls input{flex:1;min-width:200px}.panel{background:white;border:1px solid #dbe5ee;border-radius:12px;padding:16px}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:11px;text-align:left;border-bottom:1px solid #e5edf3;vertical-align:top;overflow-wrap:anywhere}th{background:#edf4f8;white-space:nowrap;overflow-wrap:normal}td:first-child,td:nth-child(4){white-space:nowrap}tbody tr:nth-child(even){background:#f7fafc}dialog{width:min(760px,95vw);max-height:85vh;border:0;border-radius:14px;padding:24px;color:inherit}dialog::backdrop{background:#112b3d88}article{border-top:1px solid #dbe5ee;padding:14px 0}article ul{padding-left:22px}article li{margin:7px 0;overflow-wrap:anywhere}button:focus-visible,input:focus-visible{outline:3px solid #2187c4;outline-offset:2px}small{color:inherit}@media(max-width:600px){main{padding:12px}table{min-width:650px}}
+</style>
+<main><header><small>CENTRAL SELIC · CONTROLE DE PROCESSOS</small><h1>Gerenciamento de Processos</h1><p id="reference"></p><button id="save" type="button">Baixar HTML</button></header>
+<div class="controls" aria-label="Localização"><button type="button" data-tab="in" aria-pressed="true">No setor</button><button type="button" data-tab="out" aria-pressed="false">Fora do setor</button></div>
+<section class="panel"><div class="controls"><input id="search" type="search" aria-label="Pesquisar processos" placeholder="Buscar por número, secretaria, responsável, data ou andamento…"></div><div class="controls" id="ageFilters" aria-label="Tempo no setor"><button type="button" data-age="all">TODOS</button><button type="button" data-age="middle" title="Mais de 15 até 30 dias">15 DIAS</button><button type="button" data-age="old" title="Mais de 30 dias">30 DIAS</button></div>
+<p id="ageNote"><small>Tempo estimado a partir da data de recebimento registrada, até a última consulta. Processos sem data válida não entram nas faixas.</small></p><p id="count" role="status"></p><div class="scroll"><table><thead><tr><th>Nº do processo</th><th>Secretaria</th><th>Responsável</th><th>Recebimento</th><th>Andamento</th><th>Histórico</th></tr></thead><tbody id="rows"></tbody></table></div></section></main>
+<dialog id="history"><form method="dialog"><button>Fechar</button></form><h2 id="historyTitle"></h2><div id="events"></div></dialog>
+<script id="data" type="application/json">__PROCESS_DATA__</script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),state=JSON.parse($('data').textContent),processes=state.snapshot||[];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const format=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Cuiaba',dateStyle:'short',timeStyle:'medium'}),dayFormat=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Cuiaba',year:'numeric',month:'2-digit',day:'2-digit'});
+const br=v=>typeof v==='string'?v.replace(/^(\d{4})-(\d{2})-(\d{2})$/,'$3/$2/$1'):v;
+const value=(field,v)=>v==null||v===''?'Não informado':typeof v==='boolean'?(v?'No setor':'Fora do setor'):field==='Recebimento'?br(v):v;
+const latest=state.history[0]?.quando, reference=latest?new Date(latest):null;
+const referenceDay=reference?dayFormat.format(reference):'';
+function day(v){const iso=String(v??'').replace(/^(\d{2})\/(\d{2})\/(\d{4})$/,'$3-$2-$1');if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))return null;const n=Date.parse(iso+'T00:00:00Z');return Number.isFinite(n)&&new Date(n).toISOString().slice(0,10)===iso?n:null;}
+function age(p){const received=day(p.data),end=day(referenceDay);return received===null||end===null||received>end?null:(end-received)/86400000;}
+const histories=new Map();for(const entry of state.history)for(const change of entry.mudancas||[]){const id=String(change.processo.id);if(!histories.has(id))histories.set(id,[]);histories.get(id).push({entry,change});}
+const indexed=processes.map((p,i)=>({p,i,days:age(p),events:histories.get(String(p.id))||[],search:norm([...Object.values(p),br(p.data)].join(' '))}));
+let tab='in',band='all';
+const bands={all:()=>true,middle:n=>n>15&&n<=30,old:n=>n>30};
+$('reference').textContent=reference?'Posição da consulta de '+format.format(reference):'Faça uma consulta em Atualizações de Processos para criar a primeira posição.';
+function render(){
+ const terms=norm($('search').value).trim().split(/\s+/).filter(Boolean);
+ const matches=indexed.filter(({p,search})=>(tab==='in'?p.ativo===true:p.ativo===false)&&terms.every(t=>search.includes(t)));
+ for(const b of document.querySelectorAll('[data-tab]')){b.setAttribute('aria-pressed',String(b.dataset.tab===tab));b.textContent=(b.dataset.tab==='in'?'No setor':'Fora do setor')+' ('+indexed.filter(x=>x.p.ativo===(b.dataset.tab==='in')).length+')';}
+ for(const b of document.querySelectorAll('[data-age]')){const k=b.dataset.age;b.setAttribute('aria-pressed',String(k===band));b.textContent=({all:'TODOS',middle:'15 DIAS',old:'30 DIAS'})[k]+' ('+matches.filter(x=>bands[k](x.days)).length+')';}
+ $('ageFilters').hidden=$('ageNote').hidden=tab!=='in';
+ const rows=tab==='in'?matches.filter(x=>bands[band](x.days)):matches;
+ const unknown=indexed.filter(x=>typeof x.p.ativo!=='boolean').length;
+ $('count').textContent=rows.length+' processo(s) exibido(s)'+(unknown?' · '+unknown+' sem situação informada na origem':'');
+ $('rows').innerHTML=rows.map(({p,i,days,events})=>'<tr><td><strong>'+esc(p.numero)+'</strong></td><td>'+esc(p.secretaria||'—')+'</td><td>'+esc(p.responsavel||'—')+'</td><td>'+esc(br(p.data)||'—')+(tab==='in'&&days!==null?'<br><small>'+days+' dias</small>':'')+'</td><td>'+esc(p.andamento||'—')+'</td><td><button type="button" data-history="'+i+'" aria-label="Histórico do processo '+esc(p.numero)+'" title="Ver histórico">▤ '+events.length+'</button></td></tr>').join('')||'<tr><td colspan="6">Nenhum processo encontrado.</td></tr>';
+}
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;band='all';render();});
+document.querySelectorAll('[data-age]').forEach(b=>b.onclick=()=>{band=b.dataset.age;render();});
+$('search').oninput=render;
+$('rows').onclick=e=>{const b=e.target.closest('[data-history]');if(!b)return;const {p,events}=indexed[Number(b.dataset.history)];$('historyTitle').textContent='Histórico · '+p.numero;
+ $('events').innerHTML=events.map(({entry,change})=>'<article><strong>'+esc(change.tipo)+'</strong> · Detectado em '+esc(format.format(new Date(entry.quando)))+(entry.desde?'<p>Consulta anterior: '+esc(format.format(new Date(entry.desde)))+'</p>':'')+((change.campos||[]).length?'<ul>'+change.campos.map(f=>'<li><strong>'+esc(f.campo)+'</strong><br>Antes: '+esc(value(f.campo,f.antes))+'<br>Depois: '+esc(value(f.campo,f.depois))+'</li>').join('')+'</ul>':'<p>'+esc(change.processo.andamento||'Sem detalhes adicionais.')+'</p>')+'</article>').join('')||'<p>Nenhuma mudança registrada para este processo desde o início do monitoramento.</p>';
+ $('history').showModal();};
+$('save').onclick=()=>{const url=URL.createObjectURL(new Blob(['<!doctype html>\n'+document.documentElement.outerHTML],{type:'text/html;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='gerenciamento-processos'+(referenceDay?'-'+referenceDay:'')+'.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('history').removeAttribute('open');render();
+</script></html>
