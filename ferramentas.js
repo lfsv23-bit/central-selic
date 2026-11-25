@@ -7,7 +7,7 @@ export function iniciarFerramentas(){
   {nome:'Conferidor de Processos',url:'ferramentas/conferidor/index.html',descricao:'Cruze planilha JSON e relatórios TXT e exporte as tabelas.'},
   {nome:'Pendências do setor',url:'ferramentas/pendencias/index.html#consultas',descricao:'Consulte e compare os relatórios importados.'},
   {nome:'Busca de Diários',url:'ferramentas/diarios/index.html',descricao:'Pesquise publicações e mantenha seu acervo online.'},
-  {nome:'Patrimônio',url:'https://patrimonio-setor-lfv.lfsv23.chatgpt.site/',descricao:'Abrir o sistema de Patrimônio em outra aba.'}
+  {nome:'Patrimônio',url:'ferramentas/patrimonio/index.html',descricao:'Controle patrimonial com acesso pela Central.'}
  ];
  const section=[...document.querySelectorAll('main .panel')].find(el=>el.querySelector('h2')?.textContent==='Ferramentas da Central');
  if(!section)return;
