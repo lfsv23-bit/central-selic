@@ -3,6 +3,7 @@ export function iniciarFerramentas(){
  if(inicializada)return;inicializada=true;
  const nav=document.querySelector('aside nav');
  const ferramentas=[
+  {nome:'Cadastro de Fornecedores',url:'ferramentas/fornecedores/index.html',descricao:'Consulte e cadastre fornecedores.'},
   {nome:'Cadastro Assistido',url:'ferramentas/cadastro/index.html',descricao:'Revise solicitações e consulte itens CATMAT.'},
   {nome:'Conferidor de Processos',url:'ferramentas/conferidor/index.html',descricao:'Cruze planilha JSON e relatórios TXT e exporte as tabelas.'},
   {nome:'Pendências do setor',url:'ferramentas/pendencias/index.html#consultas',descricao:'Consulte e compare os relatórios importados.'},
@@ -19,4 +20,5 @@ export function iniciarFerramentas(){
   const menu=a.cloneNode(true);menu.removeAttribute('style');nav.append(menu);
  }
 }
+
 
